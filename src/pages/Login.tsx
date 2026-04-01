@@ -6,21 +6,43 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useLanguage } from '@/contexts/LanguageContext';
+import axios from "axios";
 
 const Login = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
+const [formData, setFormData] = useState({
+  identifier: "", // email OR phone
+  password: "",
+});
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Simulate login
-    navigate('/');
-  };
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  try {
+    const res = await axios.post(
+      "http://localhost:5000/api/auth/login",
+      {
+        identifier: formData.identifier,
+        password: formData.password,
+      }
+    );
+
+    localStorage.setItem("token", res.data.token);
+    localStorage.setItem("user", JSON.stringify(res.data.user));
+
+ const role = res.data.user.role.toLowerCase(); 
+
+if (role === "citizen") navigate("/dashboard");
+else if (role === "officer") navigate("/officer");
+else if (role === "executive") navigate("/staff");
+
+  } catch (err: any) {
+    alert(err.response?.data?.message);
+  }
+};
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -64,15 +86,15 @@ const Login = () => {
             <CardContent className="p-6">
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">{t('form.email')}</Label>
+                 <Label htmlFor="identifier">Email or Phone</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="email"
-                      type="email"
-                      placeholder="your@email.com"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="Email or Phone"
+  value={formData.identifier}
+  onChange={(e) =>
+    setFormData({ ...formData, identifier: e.target.value })
+  }
                       className="pl-10"
                       required
                     />

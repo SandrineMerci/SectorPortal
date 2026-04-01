@@ -10,6 +10,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import PasswordStrengthIndicator from '@/components/PasswordStrengthIndicator';
 import NationalIdInput from '@/components/NationalIdInput';
 import ProfilePictureUpload from '@/components/ProfilePictureUpload';
+import axios from "axios";
+
 
 const Register = () => {
   const navigate = useNavigate();
@@ -27,10 +29,41 @@ const Register = () => {
     confirmPassword: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitted(true);
-  };
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  try {
+    const form = new FormData();
+    form.append("name", formData.name);
+    form.append("email", formData.email);
+    form.append("phone", formData.phone);
+    form.append("nationalId", formData.nationalId);
+    form.append("password", formData.password);
+
+    if (profileImage) {
+      form.append("avatar", profileImage);
+    }
+
+    const res = await axios.post(
+      "http://localhost:5000/api/auth/register",
+      form,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+
+    console.log(res.data);
+
+    // 👉 Go to OTP page and pass userId
+    navigate("/verify-otp", { state: { userId: res.data.userId } });
+
+  } catch (err: any) {
+    console.error(err.response?.data);
+    alert(err.response?.data?.message || "Registration failed");
+  }
+};
 
   if (isSubmitted) {
     return (

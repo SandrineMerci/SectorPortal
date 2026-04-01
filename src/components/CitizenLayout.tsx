@@ -10,16 +10,13 @@ interface CitizenLayoutProps {
   title: string;
   subtitle?: string;
   showFooter?: boolean;
+  user ? : { name: string; email: string }; // add this
 }
 
-const CitizenLayout = ({ children, title, subtitle, showFooter = true }: CitizenLayoutProps) => {
+const CitizenLayout = ({ children, title, subtitle, showFooter = true, user }: CitizenLayoutProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Mock user - in real app this would come from auth context
-  const user = {
-    name: 'Jean Baptiste Uwimana',
-    email: 'jean.uwimana@email.com',
-  };
+ 
 
   return (
     <div className="min-h-screen flex bg-muted/30">

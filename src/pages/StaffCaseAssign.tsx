@@ -131,14 +131,11 @@ const StaffCaseAssign = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<string | null>(null);
 
-  const currentStaff = {
-    name: 'Jean Pierre Habimana',
-    role: 'Sector Executive Secretary',
-    department: 'Jabana Sector Administration',
-  };
 
   // Find the case by ID
   const caseData = mockCases.find(c => c.id === id);
+   const storedUser = localStorage.getItem("user");
+const currentUser = storedUser ? JSON.parse(storedUser) : null;
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -250,8 +247,8 @@ const StaffCaseAssign = () => {
                 <UserCircle className="h-6 w-6" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">{currentStaff.name}</p>
-                <p className="text-xs text-sidebar-foreground/70 truncate">{currentStaff.role}</p>
+                <p className="font-medium text-sm truncate">{currentUser.name}</p>
+                <p className="text-xs text-sidebar-foreground/70 truncate uppercase">{currentUser.role}</p>
               </div>
               <Button variant="ghost" size="icon" className="text-sidebar-foreground/70 hover:text-sidebar-foreground">
                 <LogOut className="h-5 w-5" />

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Users,
   Bell,
@@ -27,6 +27,7 @@ interface StaffMember {
   role: string;
   email: string;
   phone: string;
+  department: string;
   activeCases: number;
   resolvedThisMonth: number;
   status: 'available' | 'busy' | 'offline';
@@ -34,18 +35,38 @@ interface StaffMember {
 
 const StaffTeam = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<StaffMember[]>([]);
+  const navigate = useNavigate();
 
-  const currentStaff = {
-    name: 'Jean Pierre Habimana',
-    role: 'Sector Executive Secretary',
-  };
+  const storedUser = localStorage.getItem("user");
+  const currentUser = storedUser ? JSON.parse(storedUser) : null;
 
-  const teamMembers: StaffMember[] = [
-    { id: '1', name: 'Alice Mukamana', role: 'Sector Officer', email: 'alice@jabana.gov.rw', phone: '+250 788 000 001', activeCases: 3, resolvedThisMonth: 12, status: 'available' },
-    { id: '2', name: 'Bob Nshimiyimana', role: 'Sector Officer', email: 'bob@jabana.gov.rw', phone: '+250 788 000 002', activeCases: 5, resolvedThisMonth: 8, status: 'busy' },
-    { id: '3', name: 'Claire Uwase', role: 'Sector Officer', email: 'claire@jabana.gov.rw', phone: '+250 788 000 003', activeCases: 2, resolvedThisMonth: 15, status: 'available' },
-    { id: '4', name: 'David Mugabo', role: 'Sector Officer', email: 'david@jabana.gov.rw', phone: '+250 788 000 004', activeCases: 4, resolvedThisMonth: 6, status: 'offline' },
-  ];
+  const API_URL = "http://localhost:5000/api"; // <- your backend base URL
+
+  // Fetch team from backend
+  useEffect(() => {
+    const fetchTeam = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_URL}/staff/team`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) throw new Error("Failed to fetch team");
+
+        const data = await res.json();
+        // Filter only OFFICER roles
+        const officers = data.filter((m: any) => m.role.toUpperCase() === 'OFFICER');
+        setTeamMembers(officers);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchTeam();
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -58,6 +79,13 @@ const StaffTeam = () => {
 
   const totalResolved = teamMembers.reduce((acc, m) => acc + m.resolvedThisMonth, 0);
   const totalActive = teamMembers.reduce((acc, m) => acc + m.activeCases, 0);
+
+  // Logout handler
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    navigate("/login");
+  };
 
   return (
     <div className="min-h-screen flex bg-muted/30">
@@ -106,21 +134,33 @@ const StaffTeam = () => {
               <span>Settings</span>
             </Link>
           </nav>
-
-          <div className="p-4 border-t border-sidebar-border">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-sidebar-accent flex items-center justify-center">
-                <UserCircle className="h-6 w-6" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">{currentStaff.name}</p>
-                <p className="text-xs text-sidebar-foreground/70 truncate">{currentStaff.role}</p>
-              </div>
-              <Button variant="ghost" size="icon" className="text-sidebar-foreground/70 hover:text-sidebar-foreground">
-                <LogOut className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
+<div className="p-4 border-t border-sidebar-border">
+  <div className="flex items-center gap-3">
+    <div className="w-10 h-10 rounded-full overflow-hidden bg-sidebar-accent flex items-center justify-center">
+      {currentUser?.avatar ? (
+        <img
+          src={currentUser.avatar}
+          alt="avatar"
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <UserCircle className="h-6 w-6 text-sidebar-foreground/70" />
+      )}
+    </div>
+    <div className="flex-1 min-w-0">
+      <p className="font-medium text-sm truncate">{currentUser?.name}</p>
+      <p className="text-xs text-sidebar-foreground/70 truncate uppercase">{currentUser?.role}</p>
+    </div>
+    <Button
+      variant="ghost"
+      size="icon"
+      className="text-sidebar-foreground/70 hover:text-sidebar-foreground"
+      onClick={handleLogout}
+    >
+      <LogOut className="h-5 w-5" />
+    </Button>
+  </div>
+</div>
         </div>
       </aside>
 
@@ -182,46 +222,54 @@ const StaffTeam = () => {
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-2 gap-4">
-                {teamMembers.map((member) => (
-                  <div key={member.id} className="p-4 border border-border rounded-lg">
-                    <div className="flex items-start gap-4">
-                      <div className="relative">
-                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                          <UserCircle className="h-8 w-8 text-primary" />
-                        </div>
-                        <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-card ${getStatusColor(member.status)}`} />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-medium">{member.name}</h3>
-                        <p className="text-sm text-muted-foreground">{member.role}</p>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            {member.email}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                          <Phone className="h-3 w-3" />
-                          {member.phone}
-                        </div>
-                        <div className="mt-3">
-                          <div className="flex items-center justify-between text-xs mb-1">
-                            <span>Workload</span>
-                            <span>{member.activeCases}/10 cases</span>
-                          </div>
-                          <Progress value={(member.activeCases / 10) * 100} className="h-2" />
-                        </div>
-                        <div className="flex items-center gap-4 mt-3">
-                          <Badge variant="outline">{member.activeCases} active</Badge>
-                          <Badge className="bg-success/10 text-success">
-                            <TrendingUp className="h-3 w-3 mr-1" />
-                            {member.resolvedThisMonth} resolved
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              {teamMembers.map((member) => (
+  <div key={member.id} className="p-4 border border-border rounded-lg">
+    <div className="flex items-start gap-4">
+      <div className="relative">
+        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+          <UserCircle className="h-8 w-8 text-primary" />
+        </div>
+        <div
+          className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-card ${
+            getStatusColor(member.status)
+          }`}
+        />
+      </div>
+      <div className="flex-1">
+        <h3 className="font-medium">{member.name}</h3>
+        <p className="text-sm text-muted-foreground">{member.role}</p>
+        <p className="text-xs text-muted-foreground mt-1">Department: {member.department}</p>
+
+        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <Mail className="h-3 w-3" />
+            {member.email}
+          </span>
+          <span className="flex items-center gap-1">
+            <Phone className="h-3 w-3" />
+            {member.phone}
+          </span>
+        </div>
+
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span>Workload</span>
+            <span>{member.activeCases}/10 cases</span>
+          </div>
+          <Progress value={(member.activeCases / 10) * 100} className="h-2" />
+        </div>
+
+        <div className="flex items-center gap-4 mt-3">
+          <Badge variant="outline">{member.activeCases} active</Badge>
+          <Badge className="bg-success/10 text-success">
+            <TrendingUp className="h-3 w-3 mr-1" />
+            {member.resolvedThisMonth} resolved
+          </Badge>
+        </div>
+      </div>
+    </div>
+  </div>
+))}
               </div>
             </CardContent>
           </Card>

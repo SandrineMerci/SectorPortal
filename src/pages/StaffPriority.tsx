@@ -20,13 +20,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import StatusBadge from '@/components/StatusBadge';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface Case {
   id: string;
   type: 'service' | 'complaint';
   category: string;
   description: string;
-  status: 'submitted' | 'review' | 'progress' | 'resolved';
+  status: 'submitted' | 'review' | 'progress' | 'resolved' | 'draft';
   priority: 'high' | 'medium' | 'low';
   submittedDate: string;
   citizen: string;
@@ -37,37 +39,72 @@ interface Case {
 const StaffPriority = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const currentStaff = {
-    name: 'Jean Pierre Habimana',
-    role: 'Sector Executive Secretary',
+   const storedUser = localStorage.getItem("user");
+const currentUser = storedUser ? JSON.parse(storedUser) : null;
+  const [cases, setCases] = useState<Case[]>([]);
+const [loading, setLoading] = useState(true);
+const navigate = useNavigate();
+
+  const handleLogout = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  window.location.href = "/login"; // or use navigate if you prefer
+};
+
+useEffect(() => {
+  const fetchCases = async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      const res = await fetch("http://localhost:5000/api/dashboard", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+
+      const formattedCases: Case[] = [
+        ...(data.services || []).map((s: any) => ({
+          id: String(s.reference_number),
+          type: "service",
+          category: s.category,
+          description: s.description,
+          status: s.status,
+          priority: s.priority || "medium",
+          submittedDate: s.createdAt,
+          citizen: s.user ? s.user.name : "Anonymous",
+          location: s.location || "Unknown",
+          assignedTo: s.assignedTo || null,
+        })),
+        ...(data.complaints || []).map((c: any) => ({
+          id: String(c.reference_number),
+          type: "complaint",
+          category: c.category,
+          description: c.description,
+          status: c.status,
+          priority: c.priority || "medium",
+          submittedDate: c.createdAt,
+          citizen: c.user ? c.user.name : "Anonymous",
+          location: c.location || "Unknown",
+          assignedTo: c.assignedTo || null,
+        })),
+      ];
+
+      setCases(formattedCases);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const highPriorityCases: Case[] = [
-    {
-      id: 'JAB-2025-001234',
-      type: 'service',
-      category: 'Road Repair',
-      description: 'Pothole repair request on Main Street near the market. Urgent safety hazard.',
-      status: 'progress',
-      priority: 'high',
-      submittedDate: 'Jan 5, 2025',
-      citizen: 'Jean B. Uwimana',
-      location: 'Sector 3, Cell 2',
-      assignedTo: 'Alice Mukamana',
-    },
-    {
-      id: 'JAB-CMP-2025-00456',
-      type: 'complaint',
-      category: 'Staff Misconduct',
-      description: 'Complaint about unprofessional behavior at the sector office.',
-      status: 'review',
-      priority: 'high',
-      submittedDate: 'Jan 4, 2025',
-      citizen: 'Anonymous',
-      location: 'Sector Office',
-      assignedTo: null,
-    },
-  ];
+  fetchCases();
+}, []);
+
+const highPriorityCases = cases.filter(
+  c => c.priority === "high" && c.status !== "draft"
+);
 
   return (
     <div className="min-h-screen flex bg-muted/30">
@@ -118,20 +155,42 @@ const StaffPriority = () => {
             </Link>
           </nav>
 
-          <div className="p-4 border-t border-sidebar-border">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-sidebar-accent flex items-center justify-center">
-                <UserCircle className="h-6 w-6" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">{currentStaff.name}</p>
-                <p className="text-xs text-sidebar-foreground/70 truncate">{currentStaff.role}</p>
-              </div>
-              <Button variant="ghost" size="icon" className="text-sidebar-foreground/70 hover:text-sidebar-foreground">
-                <LogOut className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
+         <div className="p-4 border-t border-sidebar-border">
+  {currentUser && (
+    <div className="flex items-center gap-3">
+      {/* Avatar */}
+      <div className="w-10 h-10 rounded-full bg-sidebar-accent flex items-center justify-center overflow-hidden">
+        {currentUser.avatar ? (
+          <img
+            src={`http://localhost:5000/uploads/${currentUser.avatar}`}
+            alt="avatar"
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <UserCircle className="h-5 w-5 text-sidebar-foreground/70" />
+        )}
+      </div>
+
+      {/* Name & Role */}
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm truncate">{currentUser.name}</p>
+        <p className="text-xs text-sidebar-foreground/70 truncate uppercase">
+          {currentUser.role}
+        </p>
+      </div>
+
+      {/* Logout */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={handleLogout}
+        className="text-sidebar-foreground/70 hover:text-sidebar-foreground"
+      >
+        <LogOut className="h-5 w-5" />
+      </Button>
+    </div>
+  )}
+</div>
         </div>
       </aside>
 
@@ -178,7 +237,10 @@ const StaffPriority = () => {
               <ScrollArea className="h-[500px]">
                 <div className="space-y-4">
                   {highPriorityCases.map((caseItem) => (
-                    <div key={caseItem.id} className="p-4 border border-destructive/30 bg-destructive/5 rounded-lg">
+                   <div
+  key={caseItem.id}
+  onClick={() => navigate(`/staff/cases/${caseItem.id}`)}
+  className="p-4 border border-destructive/30 bg-destructive/5 rounded-lg cursor-pointer hover:border-primary transition-colors">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
@@ -209,14 +271,6 @@ const StaffPriority = () => {
                             <Badge variant="outline" className="mt-2 text-warning border-warning">Unassigned</Badge>
                           )}
                         </div>
-                      </div>
-                      <div className="flex gap-2 mt-4">
-                        <Button size="sm" asChild>
-                          <Link to="/staff/cases">View Details</Link>
-                        </Button>
-                        {!caseItem.assignedTo && (
-                          <Button size="sm" variant="outline">Assign</Button>
-                        )}
                       </div>
                     </div>
                   ))}

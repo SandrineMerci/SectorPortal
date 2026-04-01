@@ -36,9 +36,11 @@ import {
 } from '@/components/ui/select';
 import { useLanguage } from '@/contexts/LanguageContext';
 import StatusBadge from '@/components/StatusBadge';
+import { useEffect } from 'react';
 
 interface Case {
   id: string;
+  referenceNumber?: string;
   type: 'service' | 'complaint';
   category: string;
   description: string;
@@ -53,84 +55,6 @@ interface Case {
   notes: { author: string; text: string; date: string }[];
 }
 
-// Mock data - in a real app this would come from an API/database
-const mockCases: Case[] = [
-  {
-    id: 'JAB-2025-001234',
-    type: 'service',
-    category: 'Road Repair',
-    description: 'Pothole repair request on Main Street near the market. The pothole is approximately 2 meters wide and poses a safety hazard.',
-    status: 'progress',
-    priority: 'high',
-    submittedDate: 'Jan 5, 2025',
-    citizen: 'Jean B. Uwimana',
-    citizenPhone: '+250 788 123 456',
-    citizenEmail: 'jean.uwimana@email.rw',
-    location: 'Sector 3, Cell 2',
-    assignedTo: 'Alice Mukamana',
-    notes: [
-      { author: 'Alice Mukamana', text: 'Inspected the site. Damage is significant.', date: 'Jan 6, 2025' },
-      { author: 'Bob Nshimiyimana', text: 'Repair team scheduled for next week.', date: 'Jan 7, 2025' },
-    ],
-  },
-  {
-    id: 'JAB-CMP-2025-00456',
-    type: 'complaint',
-    category: 'Staff Misconduct',
-    description: 'Complaint about unprofessional behavior at the sector office during morning hours.',
-    status: 'review',
-    priority: 'high',
-    submittedDate: 'Jan 4, 2025',
-    citizen: 'Anonymous',
-    location: 'Sector Office',
-    assignedTo: null,
-    notes: [],
-  },
-  {
-    id: 'JAB-2025-001235',
-    type: 'service',
-    category: 'Water Issues',
-    description: 'Low water pressure in residential area affecting multiple households.',
-    status: 'submitted',
-    priority: 'medium',
-    submittedDate: 'Jan 8, 2025',
-    citizen: 'Marie Claire N.',
-    citizenPhone: '+250 788 234 567',
-    location: 'Sector 5, Cell 1',
-    assignedTo: null,
-    notes: [],
-  },
-  {
-    id: 'JAB-2025-001236',
-    type: 'service',
-    category: 'Waste Collection',
-    description: 'Missed waste collection on Tuesday schedule for the entire neighborhood.',
-    status: 'submitted',
-    priority: 'low',
-    submittedDate: 'Jan 8, 2025',
-    citizen: 'Patrick Habimana',
-    citizenPhone: '+250 788 345 678',
-    location: 'Sector 2, Cell 4',
-    assignedTo: null,
-    notes: [],
-  },
-  {
-    id: 'JAB-2025-001220',
-    type: 'service',
-    category: 'Electricity',
-    description: 'Street light not working near the school, creating safety concerns at night.',
-    status: 'resolved',
-    priority: 'medium',
-    submittedDate: 'Jan 2, 2025',
-    citizen: 'School Admin',
-    location: 'Sector 1, Cell 3',
-    assignedTo: 'Bob Nshimiyimana',
-    notes: [
-      { author: 'Bob Nshimiyimana', text: 'Light bulb replaced successfully.', date: 'Jan 3, 2025' },
-    ],
-  },
-];
-
 const StaffCaseDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -138,16 +62,13 @@ const StaffCaseDetail = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [newNote, setNewNote] = useState('');
 
-  const currentStaff = {
-    name: 'Alice Mukamana',
-    role: 'Senior Officer',
-    department: 'Public Services',
-  };
+  const storedUser = localStorage.getItem("user");
+const currentUser = storedUser ? JSON.parse(storedUser) : null;
 
   // Find the case by ID
-  const [caseData, setCaseData] = useState<Case | null>(() => 
-    mockCases.find(c => c.id === id) || null
-  );
+ const [caseData, setCaseData] = useState<Case | null>(null);
+const [loading, setLoading] = useState(true);
+  
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -162,7 +83,7 @@ const StaffCaseDetail = () => {
     if (caseData && newNote.trim()) {
       setCaseData({
         ...caseData,
-        notes: [...caseData.notes, { author: currentStaff.name, text: newNote, date: 'Jan 11, 2025' }],
+        notes: [...caseData.notes, { author: currentUser.name, text: newNote, date: 'Jan 11, 2025' }],
       });
       setNewNote('');
     }
@@ -173,6 +94,52 @@ const StaffCaseDetail = () => {
       setCaseData({ ...caseData, status: newStatus });
     }
   };
+ useEffect(() => {
+  const fetchCase = async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(`http://localhost:5000/api/dashboard/cases/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) throw new Error("Not found");
+
+      const data = await res.json();
+
+      const formattedCase: Case = {
+        id: data.reference_number,
+        type: data.type,
+        category: data.category,
+        description: data.description,
+        status: data.status,
+        priority: data.priority || "medium",
+       submittedDate: new Date(data.created_at).toLocaleString(),
+        citizen: data.user?.name || "Anonymous",
+        citizenPhone: data.user?.phone,
+        citizenEmail: data.user?.email,
+        location: data.location || "Unknown",
+        assignedTo: data.assignedTo || null,
+        notes: data.notes || [],
+      };
+
+      setCaseData(formattedCase);
+    } catch (error) {
+      console.error(error);
+      setCaseData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (id) fetchCase();
+}, [id]);
+
+if (loading) {
+  return <div>Loading case details...</div>;
+}
 
   if (!caseData) {
     return (
@@ -180,7 +147,7 @@ const StaffCaseDetail = () => {
         <Card className="p-8 text-center">
           <h2 className="text-xl font-bold mb-4">Case Not Found</h2>
           <p className="text-muted-foreground mb-4">The case you're looking for doesn't exist.</p>
-          <Button onClick={() => navigate('/staff/cases')}>
+          <Button onClick={() =>navigate(`/staff/cases/`)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Cases
           </Button>
@@ -264,8 +231,8 @@ const StaffCaseDetail = () => {
                 <UserCircle className="h-6 w-6" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">{currentStaff.name}</p>
-                <p className="text-xs text-sidebar-foreground/70 truncate">{currentStaff.role}</p>
+                <p className="font-medium text-sm truncate">{currentUser.name}</p>
+                <p className="text-xs text-sidebar-foreground/70 truncate uppercase">{currentUser.role}</p>
               </div>
               <Button variant="ghost" size="icon" className="text-sidebar-foreground/70 hover:text-sidebar-foreground">
                 <LogOut className="h-5 w-5" />

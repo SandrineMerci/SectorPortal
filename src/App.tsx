@@ -24,6 +24,8 @@ import OfficerDashboard from "./pages/OfficerDashboard";
 import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 import ForgotPassword from "./pages/ForgotPassword";
+import VerifyOtp from "./pages/VerifyOtp";
+import ProtectedRoute from "./pages/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -40,20 +42,45 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/dashboard" element={<UserDashboard />} />
-            <Route path="/staff" element={<StaffDashboard />} />
+            {/* <Route path="/dashboard" element={<UserDashboard />} /> */}
+           <Route
+  path="/dashboard"
+  element={
+    <ProtectedRoute allowedRoles={["citizen"]}>
+      <UserDashboard />
+    </ProtectedRoute>
+  }
+/>
+            {/* <Route path="/staff" element={<StaffDashboard />} /> */}
+            <Route
+  path="/staff"
+  element={
+    <ProtectedRoute allowedRoles={["executive"]}>
+      <StaffDashboard />
+    </ProtectedRoute>
+  }
+/>
             <Route path="/staff/cases" element={<StaffCases />} />
             <Route path="/staff/cases/:id" element={<StaffCaseDetail />} />
             <Route path="/staff/cases/:id/assign" element={<StaffCaseAssign />} />
             <Route path="/staff/priority" element={<StaffPriority />} />
             <Route path="/staff/team" element={<StaffTeam />} />
             <Route path="/staff/settings" element={<StaffSettings />} />
-            <Route path="/officer" element={<OfficerDashboard />} />
+            {/* <Route path="/officer" element={<OfficerDashboard />} /> */}
+            <Route
+  path="/officer"
+  element={
+    <ProtectedRoute allowedRoles={["officer"]}>
+      <OfficerDashboard />
+    </ProtectedRoute>
+  }
+/>
             <Route path="/reports" element={<Reports />} />
             <Route path="/chatbot" element={<Chatbot />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/transparency" element={<Transparency />} />
+           <Route path="/verify-otp" element={<VerifyOtp />} />
           </Routes>
         </BrowserRouter>
         </LanguageProvider>

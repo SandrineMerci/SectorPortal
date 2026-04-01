@@ -18,68 +18,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/contexts/LanguageContext';
 import StatusBadge from '@/components/StatusBadge';
+import { useEffect } from 'react';
 
 const UserDashboard = () => {
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock user data
-  const user = {
-    name: 'Jean Baptiste Uwimana',
-    phone: '+250 788 123 456',
-    email: 'jean.uwimana@email.com',
-  };
 
-  // Mock submissions
-  const submissions = [
-    {
-      id: 'JAB-2025-001234',
-      type: 'service',
-      category: 'Road Repair',
-      description: 'Pothole repair request on Main Street near the market',
-      status: 'progress' as const,
-      submittedDate: 'Jan 5, 2025',
-      lastUpdate: 'Jan 7, 2025',
-      expectedResolution: 'Jan 12, 2025',
-    },
-    {
-      id: 'JAB-2025-001230',
-      type: 'service',
-      category: 'Water Issues',
-      description: 'Low water pressure in Sector 5 residential area',
-      status: 'resolved' as const,
-      submittedDate: 'Dec 28, 2024',
-      lastUpdate: 'Jan 3, 2025',
-      expectedResolution: 'Jan 5, 2025',
-    },
-    {
-      id: 'JAB-CMP-2025-00456',
-      type: 'complaint',
-      category: 'Staff Misconduct',
-      description: 'Complaint about unprofessional behavior at the sector office',
-      status: 'review' as const,
-      submittedDate: 'Jan 4, 2025',
-      lastUpdate: 'Jan 6, 2025',
-      expectedResolution: 'Jan 15, 2025',
-    },
-    {
-      id: 'JAB-2025-001210',
-      type: 'service',
-      category: 'Waste Collection',
-      description: 'Missed waste collection on Tuesday schedule',
-      status: 'submitted' as const,
-      submittedDate: 'Jan 8, 2025',
-      lastUpdate: 'Jan 8, 2025',
-      expectedResolution: 'Jan 10, 2025',
-    },
-  ];
-
-  const stats = {
-    total: submissions.length,
-    pending: submissions.filter(s => s.status === 'submitted' || s.status === 'review').length,
-    inProgress: submissions.filter(s => s.status === 'progress').length,
-    resolved: submissions.filter(s => s.status === 'resolved').length,
-  };
+const stats = {
+  total: submissions.length,
+  pending: submissions.filter(s => s.status === 'submitted' || s.status === 'review').length,
+  inProgress: submissions.filter(s => s.status === 'progress').length,
+  resolved: submissions.filter(s => s.status === 'resolved').length,
+};
 
   const filteredSubmissions = submissions.filter(s => 
     s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -87,8 +40,62 @@ const UserDashboard = () => {
     s.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+useEffect(() => {
+  const fetchDashboard = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const res = await fetch('http://localhost:5000/api/dashboard', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+
+      console.log("DATA:", data);
+
+      // 🔥 Merge services + complaints
+      const merged = [
+        ...data.services.map((s: any) => ({
+          id: s.reference_number,
+          type: 'service',
+          category: s.category,
+          description: s.description,
+          status: s.status,
+          submittedDate: new Date(s.created_at).toLocaleDateString(),
+          expectedResolution: 'N/A',
+        })),
+        ...data.complaints.map((c: any) => ({
+          id: c.reference_number,
+          type: 'complaint',
+          category: c.category,
+          description: c.description,
+          status: c.status,
+          submittedDate: new Date(c.created_at).toLocaleDateString(),
+          expectedResolution: 'N/A',
+        })),
+      ];
+
+      setSubmissions(merged);
+      setLoading(false);
+
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  fetchDashboard();
+}, []);
+
+if (loading) return <div>Loading...</div>; // wait until user is loaded
+
   return (
-    <CitizenLayout title={`${t('common.welcome')}, ${user.name.split(' ')[0]}!`} subtitle="Manage your service requests and complaints">
+ <CitizenLayout
+  title={`${t('common.welcome')}!`}
+  subtitle="Manage your service requests and complaints"
+>
       <div className="py-8 px-4">
         <div className="container mx-auto max-w-6xl">
           {/* Welcome Header with New Request Button */}

@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   FileText,
@@ -19,18 +19,23 @@ import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 
+
 interface CitizenSidebarProps {
   isOpen: boolean;
   onToggle: () => void;
   user?: {
     name: string;
     email: string;
+    avatar?: string;
   };
 }
 
 const CitizenSidebar = ({ isOpen, onToggle, user }: CitizenSidebarProps) => {
   const { t } = useLanguage();
   const location = useLocation();
+  const navigate = useNavigate();
+  const storedUser = localStorage.getItem("user");
+const currentUser = storedUser ? JSON.parse(storedUser) : null;
 
   const navItems = [
     { 
@@ -85,6 +90,15 @@ const CitizenSidebar = ({ isOpen, onToggle, user }: CitizenSidebarProps) => {
   ];
 
   const isActive = (path: string) => location.pathname === path;
+  
+  const handleLogout = () => {
+  // remove stored auth data
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+
+  // redirect to login page
+  navigate("/login");
+};
 
   return (
     <>
@@ -167,27 +181,46 @@ const CitizenSidebar = ({ isOpen, onToggle, user }: CitizenSidebarProps) => {
           </nav>
 
           {/* User Section */}
-          <div className="p-4 border-t border-sidebar-border">
-            {user ? (
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-sidebar-accent flex items-center justify-center">
-                  <User className="h-5 w-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{user.name}</p>
-                  <p className="text-xs text-sidebar-foreground/70 truncate">{user.email}</p>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="text-sidebar-foreground/70 hover:text-sidebar-foreground"
-                  asChild
-                >
-                  <Link to="/login">
-                    <LogOut className="h-5 w-5" />
-                  </Link>
-                </Button>
-              </div>
+        <div className="p-4 border-t border-sidebar-border">
+  {currentUser ? (
+    <div className="flex items-center gap-3">
+      
+      {/* Avatar */}
+      <div className="w-10 h-10 rounded-full overflow-hidden bg-sidebar-accent flex items-center justify-center">
+        {currentUser.avatar ? (
+          <img
+            src={`http://localhost:5000/uploads/${currentUser.avatar}`}
+            alt="avatar"
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <User className="h-5 w-5" />
+        )}
+      </div>
+
+      {/* User Info */}
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm truncate">
+          {currentUser.name}
+        </p>
+        
+        <p className="text-xs text-sidebar-foreground/70 truncate">
+          {currentUser.email || currentUser.phone}
+        </p>
+      </div>
+
+      {/* Logout */}
+      <Button 
+        variant="ghost" 
+        size="icon"  
+        onClick={handleLogout}
+        className="text-sidebar-foreground/70 hover:text-sidebar-foreground"
+      >
+        <LogOut className="h-5 w-5" />
+      </Button>
+
+    </div>
+
             ) : (
               <div className="flex gap-2">
                 <Button asChild variant="outline" className="flex-1 border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent">

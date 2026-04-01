@@ -20,14 +20,13 @@ const Services = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [formData, setFormData] = useState({
+  const [referenceNumber, setReferenceNumber] = useState('');
+ const [formData, setFormData] = useState({
     category: '',
     location: '',
     description: '',
     priority: '',
-    name: '',
-    phone: '',
-    email: '',
+    attachments: [] as File[],
   });
 
   const categories = [
@@ -44,11 +43,54 @@ const Services = () => {
     { value: 'medium', label: t('priority.medium') },
     { value: 'high', label: t('priority.high') },
   ];
+const handleSubmit = async (status: 'submitted' | 'draft') => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return alert('You must be logged in to submit a request');
+  }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Simulate submission
-    setIsSubmitted(true);
+  // Manual validation
+  if (!formData.category || !formData.priority || !formData.location || !formData.description) {
+    return alert('Please fill in all required fields (*) before submitting.');
+  }
+
+  try {
+    const data = new FormData();
+    data.append('category', formData.category);
+    data.append('priority', formData.priority);
+    data.append('location', formData.location);
+    data.append('description', formData.description);
+    data.append('status', status);
+
+    formData.attachments.forEach((file) => data.append('attachments', file));
+
+    const res = await fetch('http://localhost:5000/api/services', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: data,
+    });
+
+    // const result = await res.json();
+
+    if (res.ok) {
+      const result = await res.json();
+      setReferenceNumber(result.referenceNumber);
+      setIsSubmitted(true);
+    } else {
+       const result = await res.json();
+      alert(result.message);
+    }
+  } catch (err) {
+    console.error('Submission error:', err);
+    alert('Submission failed. Please try again.');
+  }
+};
+
+  const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    setFormData({ ...formData, attachments: Array.from(e.target.files) });
   };
 
   if (isSubmitted) {
@@ -68,7 +110,7 @@ const Services = () => {
               </p>
               <div className="bg-muted rounded-lg p-4 mb-6">
                 <p className="text-sm text-muted-foreground mb-1">Reference Number</p>
-                <p className="font-display font-bold text-xl text-primary">JAB-2025-001235</p>
+                <p className="font-display font-bold text-xl text-primary">{referenceNumber}</p>
               </div>
               <p className="text-sm text-muted-foreground mb-6">
                 Please save this reference number to track your request status.
@@ -100,7 +142,7 @@ const Services = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6">
-              <form onSubmit={handleSubmit} className="space-y-6">
+            <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); handleSubmit("submitted"); }}>
                 {/* Service Category */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
@@ -174,6 +216,7 @@ const Services = () => {
                 {/* File Upload */}
                 <div className="space-y-2">
                   <Label>Attachments (Optional)</Label>
+                   <input type="file" multiple onChange={handleFiles} />
                   <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors cursor-pointer">
                     <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                     <p className="text-sm text-muted-foreground">
@@ -188,7 +231,7 @@ const Services = () => {
                 <hr className="border-border" />
 
                 {/* Contact Information */}
-                <div>
+                {/* <div>
                   <h3 className="font-display font-semibold text-lg text-foreground mb-4">
                     Contact Information
                   </h3>
@@ -225,22 +268,18 @@ const Services = () => {
                       />
                     </div>
                   </div>
-                </div>
+                </div> */}
 
                 {/* Submit */}
-                <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                  <Button type="submit" size="lg" className="flex-1">
-                    {t('form.submit')}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="lg"
-                    asChild
-                  >
-                    <Link to="/dashboard">{t('form.cancel')}</Link>
-                  </Button>
-                </div>
+                        <div className="flex flex-col sm:flex-row gap-4 pt-4">
+          <Button type="submit" className="flex-1">
+            Submit
+          </Button>
+          <Button type="button" variant="outline" onClick={() => handleSubmit('draft')} className="flex-1">
+            Save as Draft
+          </Button>
+        </div>
+
               </form>
             </CardContent>
           </Card>

@@ -1,6 +1,17 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Globe, ChevronDown, MessageSquare, Bell, Shield, BarChart3, Users, Eye } from 'lucide-react';
+import {
+  Menu,
+  X,
+  Globe,
+  ChevronDown,
+  MessageSquare,
+  Bell,
+  Shield,
+  BarChart3,
+  Users,
+  Eye,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import {
@@ -23,12 +34,29 @@ const Header = () => {
   const { language, setLanguage, t } = useLanguage();
   const location = useLocation();
 
+  //  AUTH STATE
+  const isLoggedIn = !!localStorage.getItem("user");
+
+
+const user = JSON.parse(localStorage.getItem("user") || "null");
+
+<img
+  src={`http://localhost:5000/uploads/${user?.avatar}`}
+  alt="avatar"
+  className="w-10 h-10 rounded-full"
+/>
+
+  //  NAV LINKS (only show some when logged in)
   const mainNavLinks = [
     { href: '/', label: t('nav.home') },
-    { href: '/services', label: t('nav.services') },
-    { href: '/complaints', label: t('nav.complaints') },
-    // { href: '/track', label: t('nav.track') },
+    ...(isLoggedIn
+      ? [
+          { href: '/services', label: t('nav.services') },
+          { href: '/complaints', label: t('nav.complaints') },
+        ]
+      : []),
   ];
+
 
   const portalLinks = [
     { href: '/dashboard', label: 'My Dashboard', icon: Users, description: 'View your submissions and track progress' },
@@ -37,24 +65,19 @@ const Header = () => {
     { href: '/transparency', label: 'Transparency Portal', icon: Eye, description: 'Public data and performance metrics' },
   ];
 
-  const staffLinks = [
-    { href: '/staff', label: 'Staff Dashboard', icon: Users, description: 'Manage cases and assignments' },
-    { href: '/reports', label: 'Reports & Analytics', icon: BarChart3, description: 'View KPIs and performance data' },
-    { href: '/privacy', label: 'Data Protection', icon: Shield, description: 'Privacy settings and compliance' },
-  ];
-
+  //  MOBILE LINKS
   const allMobileLinks = [
     { href: '/', label: t('nav.home') },
-    { href: '/services', label: t('nav.services') },
-    { href: '/complaints', label: t('nav.complaints') },
-    { href: '/track', label: t('nav.track') },
-    { href: '/dashboard', label: 'My Dashboard' },
-    { href: '/chatbot', label: 'AI Assistant' },
-    { href: '/notifications', label: 'Notifications' },
-    { href: '/transparency', label: 'Transparency Portal' },
-    { href: '/staff', label: 'Staff Dashboard' },
-    { href: '/reports', label: 'Reports & Analytics' },
-    { href: '/privacy', label: 'Data Protection' },
+    ...(isLoggedIn
+      ? [
+          { href: '/services', label: t('nav.services') },
+          { href: '/complaints', label: t('nav.complaints') },
+          { href: '/dashboard', label: 'My Dashboard' },
+          { href: '/chatbot', label: 'AI Assistant' },
+          { href: '/notifications', label: 'Notifications' },
+          { href: '/transparency', label: 'Transparency Portal' },
+        ]
+      : []),
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -63,6 +86,7 @@ const Header = () => {
     <header className="sticky top-0 z-50 w-full bg-card/95 backdrop-blur-md border-b border-border shadow-gov">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
+
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
             <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center shadow-gov">
@@ -91,68 +115,54 @@ const Header = () => {
                 {link.label}
               </Link>
             ))}
-            
-            <NavigationMenu>
-              <NavigationMenuList>
-                <NavigationMenuItem>
-                  <NavigationMenuTrigger className="bg-transparent">Citizen Portal</NavigationMenuTrigger>
-                  <NavigationMenuContent>
-                    <ul className="grid w-[400px] gap-2 p-4">
-                      {portalLinks.map((link) => (
-                        <li key={link.href}>
-                          <NavigationMenuLink asChild>
-                            <Link
-                              to={link.href}
-                              className="flex items-start gap-3 rounded-md p-3 hover:bg-muted transition-colors"
-                            >
-                              <link.icon className="h-5 w-5 text-primary mt-0.5" />
-                              <div>
-                                <div className="text-sm font-medium">{link.label}</div>
-                                <p className="text-xs text-muted-foreground">{link.description}</p>
-                              </div>
-                            </Link>
-                          </NavigationMenuLink>
-                        </li>
-                      ))}
-                    </ul>
-                  </NavigationMenuContent>
-                </NavigationMenuItem>
-                
-                {/* <NavigationMenuItem>
-                  <NavigationMenuTrigger className="bg-transparent">Staff Area</NavigationMenuTrigger>
-                  <NavigationMenuContent>
-                    <ul className="grid w-[400px] gap-2 p-4">
-                      {staffLinks.map((link) => (
-                        <li key={link.href}>
-                          <NavigationMenuLink asChild>
-                            <Link
-                              to={link.href}
-                              className="flex items-start gap-3 rounded-md p-3 hover:bg-muted transition-colors"
-                            >
-                              <link.icon className="h-5 w-5 text-primary mt-0.5" />
-                              <div>
-                                <div className="text-sm font-medium">{link.label}</div>
-                                <p className="text-xs text-muted-foreground">{link.description}</p>
-                              </div>
-                            </Link>
-                          </NavigationMenuLink>
-                        </li>
-                      ))}
-                    </ul>
-                  </NavigationMenuContent>
-                </NavigationMenuItem> */}
-              </NavigationMenuList>
-            </NavigationMenu>
+
+            {/*  Citizen Portal (ONLY WHEN LOGGED IN) */}
+            {isLoggedIn && (
+              <NavigationMenu>
+                <NavigationMenuList>
+                  <NavigationMenuItem>
+                    <NavigationMenuTrigger className="bg-transparent">
+                      Citizen Portal
+                    </NavigationMenuTrigger>
+                    <NavigationMenuContent>
+                      <ul className="grid w-[400px] gap-2 p-4">
+                        {portalLinks.map((link) => (
+                          <li key={link.href}>
+                            <NavigationMenuLink asChild>
+                              <Link
+                                to={link.href}
+                                className="flex items-start gap-3 rounded-md p-3 hover:bg-muted transition-colors"
+                              >
+                                <link.icon className="h-5 w-5 text-primary mt-0.5" />
+                                <div>
+                                  <div className="text-sm font-medium">{link.label}</div>
+                                  <p className="text-xs text-muted-foreground">
+                                    {link.description}
+                                  </p>
+                                </div>
+                              </Link>
+                            </NavigationMenuLink>
+                          </li>
+                        ))}
+                      </ul>
+                    </NavigationMenuContent>
+                  </NavigationMenuItem>
+                </NavigationMenuList>
+              </NavigationMenu>
+            )}
           </nav>
 
-          {/* Right Side Actions */}
+          {/* Right Side */}
           <div className="flex items-center gap-2">
-            {/* Language Switcher */}
+
+            {/* Language */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="gap-2">
                   <Globe className="h-4 w-4" />
-                  <span className="hidden sm:inline">{language === 'en' ? 'English' : 'Kinyarwanda'}</span>
+                  <span className="hidden sm:inline">
+                    {language === 'en' ? 'English' : 'Kinyarwanda'}
+                  </span>
                   <ChevronDown className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
@@ -166,65 +176,84 @@ const Header = () => {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Auth Buttons */}
-            <div className="hidden lg:flex items-center gap-2">
-              {/* <Button variant="ghost" size="sm" asChild>
-                <Link to="/login">{t('nav.login')}</Link>
-              </Button>
-              <Button size="sm" asChild>
-                <Link to="/register">{t('nav.register')}</Link>
-              </Button> */}
-              <Button size="sm" asChild>
-                <Link to="/Login">{t('Logout')}</Link>
-              </Button>
-            </div>
+            {/*  AUTH BUTTONS */}
+          <div className="hidden lg:flex items-center gap-2">
+  {!user && (
+    <>
+      <Button variant="ghost" size="sm" asChild>
+        <Link to="/login">Login</Link>
+      </Button>
+      <Button size="sm" asChild>
+        <Link to="/register">Register</Link>
+      </Button>
+    </>
+  )}
 
-            {/* Mobile Menu Toggle */}
+  {user && (
+    <Button
+      size="sm"
+      onClick={() => {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+      }}
+    >
+      Logout
+    </Button>
+  )}
+</div>
+
+            {/* Mobile toggle */}
             <Button
               variant="ghost"
               size="icon"
               className="lg:hidden"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
             >
-              {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              {isMenuOpen ? <X /> : <Menu />}
             </Button>
           </div>
         </div>
 
         {/* Mobile Menu */}
         {isMenuOpen && (
-          <div className="lg:hidden py-4 border-t border-border animate-slide-up max-h-[70vh] overflow-y-auto">
+          <div className="lg:hidden py-4 border-t border-border">
             <nav className="flex flex-col gap-1">
+
               {allMobileLinks.map((link) => (
                 <Link
                   key={link.href}
                   to={link.href}
                   onClick={() => setIsMenuOpen(false)}
-                  className={`px-4 py-3 rounded-md text-sm font-medium transition-colors ${
-                    isActive(link.href)
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-foreground hover:bg-muted'
-                  }`}
+                  className="px-4 py-3 hover:bg-muted"
                 >
                   {link.label}
                 </Link>
               ))}
-              <hr className="my-2 border-border" />
-              <Link
-                to="/login"
-                onClick={() => setIsMenuOpen(false)}
-                className="px-4 py-3 rounded-md text-sm font-medium text-foreground hover:bg-muted"
-              >
-                {t('nav.login')}
-              </Link>
-              <Link
-                to="/register"
-                onClick={() => setIsMenuOpen(false)}
-                className="px-4 py-3 rounded-md text-sm font-medium bg-primary text-primary-foreground"
-              >
-                {t('nav.register')}
-              </Link>
-              
+
+              <hr className="my-2" />
+
+              {!isLoggedIn ? (
+                <>
+                  <Link to="/login" className="px-4 py-3">
+                    {t('nav.login')}
+                  </Link>
+                  <Link to="/register" className="px-4 py-3 bg-primary text-white">
+                    {t('nav.register')}
+                  </Link>
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    localStorage.removeItem("user");
+                    window.location.href = "/";
+                  }}
+                  className="px-4 py-3 text-left"
+                >
+                  Logout
+                </button>
+              )}
+
             </nav>
           </div>
         )}

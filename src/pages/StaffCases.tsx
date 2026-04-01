@@ -56,13 +56,16 @@ import {
 } from '@/components/ui/dialog';
 import { useLanguage } from '@/contexts/LanguageContext';
 import StatusBadge from '@/components/StatusBadge';
+import { useEffect } from 'react';
+import axios from 'axios';
+import { useParams } from "react-router-dom";
 
 interface Case {
   id: string;
   type: 'service' | 'complaint';
   category: string;
   description: string;
-  status: 'submitted' | 'review' | 'progress' | 'resolved';
+  status: 'submitted' | 'review' | 'progress' | 'resolved' | 'draft';
   priority: 'high' | 'medium' | 'low';
   submittedDate: string;
   citizen: string;
@@ -91,12 +94,13 @@ const StaffCases = () => {
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [newNote, setNewNote] = useState('');
+  const [cases, setCases] = useState<Case[]>([]);
+const [loading, setLoading] = useState(false);
+const [error, setError] = useState('');
 
-  const currentStaff = {
-    name: 'Jean Pierre Habimana',
-    role: 'Sector Executive Secretary',
-    department: 'Jabana Sector Administration',
-  };
+  const storedUser = localStorage.getItem("user");
+ // console.log("Stored user:", localStorage.getItem("user"));
+const currentUser = storedUser ? JSON.parse(storedUser) : null;
 
   const teamMembers: StaffMember[] = [
     { id: '1', name: 'Alice Mukamana', role: 'Sector Officer', activeCases: 3, resolvedThisMonth: 12 },
@@ -105,99 +109,42 @@ const StaffCases = () => {
     { id: '4', name: 'David Mugabo', role: 'Sector Officer', activeCases: 4, resolvedThisMonth: 6 },
   ];
 
-  const [cases, setCases] = useState<Case[]>([
-    {
-      id: 'JAB-2025-001234',
-      type: 'service',
-      category: 'Road Repair',
-      description: 'Pothole repair request on Main Street near the market.',
-      status: 'progress',
-      priority: 'high',
-      submittedDate: 'Jan 5, 2025',
-      citizen: 'Jean B. Uwimana',
-      citizenPhone: '+250 788 123 456',
-      citizenEmail: 'jean.uwimana@email.rw',
-      location: 'Sector 3, Cell 2',
-      assignedTo: 'Alice Mukamana',
-      notes: [
-        { author: 'Alice Mukamana', text: 'Inspected the site. Damage is significant.', date: 'Jan 6, 2025' },
-      ],
-    },
-    {
-      id: 'JAB-CMP-2025-00456',
-      type: 'complaint',
-      category: 'Staff Misconduct',
-      description: 'Complaint about unprofessional behavior at the sector office.',
-      status: 'review',
-      priority: 'high',
-      submittedDate: 'Jan 4, 2025',
-      citizen: 'Anonymous',
-      location: 'Sector Office',
-      assignedTo: null,
-      notes: [],
-    },
-    {
-      id: 'JAB-2025-001235',
-      type: 'service',
-      category: 'Water Issues',
-      description: 'Low water pressure in residential area.',
-      status: 'submitted',
-      priority: 'medium',
-      submittedDate: 'Jan 8, 2025',
-      citizen: 'Marie Claire N.',
-      citizenPhone: '+250 788 234 567',
-      location: 'Sector 5, Cell 1',
-      assignedTo: null,
-      notes: [],
-    },
-    {
-      id: 'JAB-2025-001236',
-      type: 'service',
-      category: 'Waste Collection',
-      description: 'Missed waste collection on Tuesday schedule.',
-      status: 'submitted',
-      priority: 'low',
-      submittedDate: 'Jan 8, 2025',
-      citizen: 'Patrick Habimana',
-      citizenPhone: '+250 788 345 678',
-      location: 'Sector 2, Cell 4',
-      assignedTo: null,
-      notes: [],
-    },
-    {
-      id: 'JAB-2025-001220',
-      type: 'service',
-      category: 'Electricity',
-      description: 'Street light not working near the school.',
-      status: 'resolved',
-      priority: 'medium',
-      submittedDate: 'Jan 2, 2025',
-      citizen: 'School Admin',
-      location: 'Sector 1, Cell 3',
-      assignedTo: 'Bob Nshimiyimana',
-      notes: [
-        { author: 'Bob Nshimiyimana', text: 'Light bulb replaced successfully.', date: 'Jan 3, 2025' },
-      ],
-    },
-  ]);
 
-  const stats = {
-    total: cases.length,
-    new: cases.filter(c => c.status === 'submitted').length,
-    inProgress: cases.filter(c => c.status === 'progress' || c.status === 'review').length,
-    resolved: cases.filter(c => c.status === 'resolved').length,
-    highPriority: cases.filter(c => c.priority === 'high').length,
-  };
+const validCases = cases.filter(c => c.status !== "draft");
 
-  const filteredCases = cases.filter(c => {
-    const matchesSearch = 
-      c.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.citizen.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesPriority = selectedPriority === 'all' || c.priority === selectedPriority;
-    const matchesStatus = selectedStatus === 'all' || c.status === selectedStatus;
-    return matchesSearch && matchesPriority && matchesStatus;
-  });
+const stats = {
+  total: validCases.length,
+  new: validCases.filter(c => c.status === 'submitted').length,
+  inProgress: validCases.filter(c => c.status === 'progress' || c.status === 'review').length,
+  resolved: validCases.filter(c => c.status === 'resolved').length,
+  highPriority: validCases.filter(c => c.priority === 'high').length,
+};
+
+const filteredCases = cases.filter(c => {
+  if (c.status === "draft") return false;
+
+  // 🔍 Build ONE searchable string (everything)
+  const searchableText = `
+    ${c.id}
+    ${c.category}
+    ${c.description}
+    ${c.citizen}
+    ${c.location}
+    ${c.assignedTo || ""}
+    ${c.status}
+    ${c.priority}
+  `.toLowerCase();
+
+  const matchesSearch = searchableText.includes(searchQuery.toLowerCase());
+
+  const matchesPriority =
+    selectedPriority === "all" || c.priority === selectedPriority;
+
+  const matchesStatus =
+    selectedStatus === "all" || c.status === selectedStatus;
+
+  return matchesSearch && matchesPriority && matchesStatus;
+});
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -214,7 +161,7 @@ const StaffCases = () => {
         if (c.id === selectedCase.id) {
           return {
             ...c,
-            notes: [...c.notes, { author: currentStaff.name, text: newNote, date: 'Jan 11, 2025' }],
+            notes: [...c.notes, { author: currentUser.name, text: newNote, date: 'Jan 11, 2025' }],
           };
         }
         return c;
@@ -222,7 +169,7 @@ const StaffCases = () => {
       setCases(updatedCases);
       setSelectedCase({
         ...selectedCase,
-        notes: [...selectedCase.notes, { author: currentStaff.name, text: newNote, date: 'Jan 11, 2025' }],
+        notes: [...selectedCase.notes, { author: currentUser.name, text: newNote, date: 'Jan 11, 2025' }],
       });
       setNewNote('');
     }
@@ -255,6 +202,78 @@ const StaffCases = () => {
       setSelectedCase({ ...selectedCase, status: newStatus });
     }
   };
+  const { id } = useParams<{ id: string }>();
+
+
+if (!currentUser) {
+  console.error("User is not logged in");
+  navigate("/login"); // optional redirect
+  return null;
+}
+
+useEffect(() => {
+  const fetchCases = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("http://localhost:5000/api/dashboard", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+
+     const formattedCases: Case[] = [
+  ...(data.services || []).map((s: any) => ({
+    id: String(s.reference_number), // 🔥 FIX
+    type: "service",
+    category: s.category,
+    description: s.description,
+    status: s.status,
+    priority: s.priority || "medium",
+    submittedDate: s.createdAt,
+    citizen: s.user ? s.user.name : "Anonymous",
+    citizenPhone: s.user?.phone,
+    citizenEmail: s.user?.email,
+    location: s.location || "Unknown",
+    assignedTo: s.assignedTo || null,
+    notes: s.notes || [],
+  })),
+  ...(data.complaints || []).map((c: any) => ({
+    id: String(c.reference_number), // 🔥 FIX
+    type: "complaint",
+    category: c.category,
+    description: c.description,
+    status: c.status,
+    priority: c.priority || "medium",
+    submittedDate: c.createdAt,
+    citizen: c.user ? c.user.name : "Anonymous",
+    citizenPhone: c.user?.phone,
+    citizenEmail: c.user?.email,
+    location: c.location || "Unknown",
+    assignedTo: c.assignedTo || null,
+    notes: c.notes || [],
+  })),
+];
+
+      setCases(formattedCases);
+    } catch (err) {
+      console.error("Error fetching cases", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchCases();
+}, []);
+
+
+  const handleLogout = () => {
+  // remove stored auth data
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+
+  // redirect to login page
+  navigate("/login");
+};
+
 
   return (
     <div className="min-h-screen flex bg-muted/30">
@@ -327,20 +346,42 @@ const StaffCases = () => {
             </Link>
           </nav>
 
-          <div className="p-4 border-t border-sidebar-border">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-sidebar-accent flex items-center justify-center">
-                <UserCircle className="h-6 w-6" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">{currentStaff.name}</p>
-                <p className="text-xs text-sidebar-foreground/70 truncate">{currentStaff.role}</p>
-              </div>
-              <Button variant="ghost" size="icon" className="text-sidebar-foreground/70 hover:text-sidebar-foreground">
-                <LogOut className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
+       <div className="p-4 border-t border-sidebar-border">
+  {currentUser && (
+    <div className="flex items-center gap-3">
+      {/* Avatar */}
+      <div className="w-10 h-10 rounded-full bg-sidebar-accent flex items-center justify-center overflow-hidden">
+        {currentUser.avatar ? (
+          <img
+            src={`http://localhost:5000/uploads/${currentUser.avatar}`}
+            alt="avatar"
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <UserCircle className="h-5 w-5 text-sidebar-foreground/70" />
+        )}
+      </div>
+
+      {/* Name & Role */}
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm truncate">{currentUser.name}</p>
+        <p className="text-xs text-sidebar-foreground/70 truncate uppercase">
+          {currentUser.role}
+        </p>
+      </div>
+
+      {/* Logout */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={handleLogout}
+        className="text-sidebar-foreground/70 hover:text-sidebar-foreground"
+      >
+        <LogOut className="h-5 w-5" />
+      </Button>
+    </div>
+  )}
+</div>
         </div>
       </aside>
 
@@ -432,12 +473,12 @@ const StaffCases = () => {
             <CardContent>
               <ScrollArea className="h-[600px]">
                 <div className="space-y-3">
-                  {filteredCases.map((caseItem) => (
-                    <div
-                      key={caseItem.id}
-                      className="p-4 border border-border rounded-lg hover:border-primary/50 cursor-pointer transition-colors"
-                      onClick={() => navigate(`/staff/cases/${caseItem.id}`)}
-                    >
+                {filteredCases.map((caseItem, idx) => (
+  <div
+    key={`${caseItem.id}-${idx}`} // combines id + index to guarantee uniqueness
+    className="p-4 border border-border rounded-lg hover:border-primary/50 cursor-pointer transition-colors"
+    onClick={() => navigate(`/staff/cases/${caseItem.id}`)}
+  >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-2">
@@ -563,15 +604,15 @@ const StaffCases = () => {
                 <div>
                   <h4 className="text-sm font-medium mb-2">Notes ({selectedCase.notes.length})</h4>
                   <div className="space-y-2 mb-3">
-                    {selectedCase.notes.map((note, idx) => (
-                      <div key={idx} className="p-3 bg-muted/50 rounded-lg">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-medium">{note.author}</span>
-                          <span className="text-xs text-muted-foreground">{note.date}</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">{note.text}</p>
-                      </div>
-                    ))}
+              {selectedCase.notes.map((note) => (
+  <div key={`${note.author}-${note.date}-${note.text}`} className="p-3 bg-muted/50 rounded-lg">
+    <div className="flex items-center justify-between mb-1">
+      <span className="text-sm font-medium">{note.author}</span>
+      <span className="text-xs text-muted-foreground">{note.date}</span>
+    </div>
+    <p className="text-sm text-muted-foreground">{note.text}</p>
+  </div>
+))}
                   </div>
                   <div className="flex gap-2">
                     <Textarea

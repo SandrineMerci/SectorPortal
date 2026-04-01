@@ -3,13 +3,13 @@ import { useLanguage } from '@/contexts/LanguageContext';
 type Status = 'submitted' | 'review' | 'progress' | 'resolved';
 
 interface StatusBadgeProps {
-  status: Status;
+  status: string; // 👈 allow any string from backend
 }
 
 const StatusBadge = ({ status }: StatusBadgeProps) => {
   const { t } = useLanguage();
 
-  const statusConfig = {
+  const statusConfig: Record<string, { label: string; className: string }> = {
     submitted: {
       label: t('status.submitted'),
       className: 'bg-info/10 text-info border-info/20',
@@ -28,18 +28,28 @@ const StatusBadge = ({ status }: StatusBadgeProps) => {
     },
   };
 
-  const config = statusConfig[status];
+  const config = statusConfig[status] || {
+    label: status,
+    className: 'bg-muted text-muted-foreground border-border',
+  };
 
   return (
     <span
       className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${config.className}`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full mr-2 ${
-        status === 'submitted' ? 'bg-info' :
-        status === 'review' ? 'bg-warning' :
-        status === 'progress' ? 'bg-primary' :
-        'bg-success'
-      }`} />
+      <span
+        className={`w-1.5 h-1.5 rounded-full mr-2 ${
+          status === 'submitted'
+            ? 'bg-info'
+            : status === 'review'
+            ? 'bg-warning'
+            : status === 'progress'
+            ? 'bg-primary'
+            : status === 'resolved'
+            ? 'bg-success'
+            : 'bg-muted-foreground'
+        }`}
+      />
       {config.label}
     </span>
   );

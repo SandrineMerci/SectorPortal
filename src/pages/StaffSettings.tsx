@@ -29,11 +29,8 @@ const StaffSettings = () => {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
 
-  const currentStaff = {
-    name: 'Jean Pierre Habimana',
-    role: 'Sector Executive Secretary',
-    email: 'secretary@jabana.gov.rw',
-  };
+  const storedUser = localStorage.getItem("user");
+const currentUser = storedUser ? JSON.parse(storedUser) : null;
 
   return (
     <div className="min-h-screen flex bg-muted/30">
@@ -89,8 +86,8 @@ const StaffSettings = () => {
                 <UserCircle className="h-6 w-6" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">{currentStaff.name}</p>
-                <p className="text-xs text-sidebar-foreground/70 truncate">{currentStaff.role}</p>
+                <p className="font-medium text-sm truncate">{currentUser.name}</p>
+                <p className="text-xs text-sidebar-foreground/70 truncate uppercase">{currentUser.role}</p>
               </div>
               <Button variant="ghost" size="icon" className="text-sidebar-foreground/70 hover:text-sidebar-foreground">
                 <LogOut className="h-5 w-5" />
@@ -133,16 +130,16 @@ const StaffSettings = () => {
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Full Name</Label>
-                  <Input id="name" defaultValue={currentStaff.name} />
+                  <Input id="name" defaultValue={currentUser.name} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" defaultValue={currentStaff.email} />
+                  <Input id="email" type="email" defaultValue={currentUser.email} />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="role">Role</Label>
-                <Input id="role" defaultValue={currentStaff.role} disabled />
+                <Input id="role" defaultValue={currentUser.role} disabled />
               </div>
               <Button>Save Changes</Button>
             </CardContent>

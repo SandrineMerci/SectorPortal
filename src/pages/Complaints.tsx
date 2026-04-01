@@ -17,21 +17,18 @@ import {
 } from '@/components/ui/select';
 import { useLanguage } from '@/contexts/LanguageContext';
 
+
 const Complaints = () => {
   const { t } = useLanguage();
+  const [referenceNumber, setReferenceNumber] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
-  const [formData, setFormData] = useState({
-    category: '',
-    subCategory: '',
-    priority: '',
-    description: '',
-    location: '',
-    name: '',
-    phone: '',
-    email: '',
-    nationalId: '',
-  });
+ const [formData, setFormData] = useState({
+  category: '',
+  priority: '',
+  description: '',
+  location: '',
+});
 
   const categories = [
     { value: 'corruption', label: 'Corruption / Misuse of Funds' },
@@ -48,10 +45,47 @@ const Complaints = () => {
     { value: 'high', label: t('priority.high') },
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitted(true);
-  };
+ const handleSubmit = async (status: 'submitted' | 'draft') => {
+  const token = localStorage.getItem('token');
+
+  if (!token) {
+    return alert('You must be logged in');
+  }
+
+  if (!formData.category || !formData.priority || !formData.description) {
+    return alert('Fill all required fields');
+  }
+
+  try {
+    const res = await fetch('http://localhost:5000/api/complaints', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        category: formData.category,
+        priority: formData.priority,
+        description: formData.description,
+        location: formData.location,
+        status,
+        isAnonymous,
+      }),
+    });
+
+    if (res.ok) {
+      const result = await res.json();
+      setReferenceNumber(result.referenceNumber);
+      setIsSubmitted(true);
+    } else {
+      const result = await res.json();
+      alert(result.message);
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Submission failed');
+  }
+};
 
   if (isSubmitted) {
     return (
@@ -70,7 +104,7 @@ const Complaints = () => {
               </p>
               <div className="bg-muted rounded-lg p-4 mb-6">
                 <p className="text-sm text-muted-foreground mb-1">Reference Number</p>
-                <p className="font-display font-bold text-xl text-primary">JAB-CMP-2025-00456</p>
+                <p className="font-display font-bold text-xl text-primary">{referenceNumber}</p>
               </div>
               {isAnonymous ? (
                 <p className="text-sm text-muted-foreground mb-6">
@@ -131,7 +165,7 @@ const Complaints = () => {
                 <Switch checked={isAnonymous} onCheckedChange={setIsAnonymous} />
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-6">
+             <form onSubmit={(e) => { e.preventDefault(); handleSubmit("submitted"); }} className="space-y-6">
                 {/* Complaint Category */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
@@ -198,7 +232,7 @@ const Complaints = () => {
                 </div>
 
                 {/* Contact Information (shown if not anonymous) */}
-                {!isAnonymous && (
+                {/* {!isAnonymous && (
                   <>
                     <hr className="border-border" />
                     <div>
@@ -249,7 +283,7 @@ const Complaints = () => {
                       </div>
                     </div>
                   </>
-                )}
+                )} */}
 
                 {/* Submit */}
                 <div className="flex flex-col sm:flex-row gap-4 pt-4">
@@ -260,9 +294,9 @@ const Complaints = () => {
                     type="button"
                     variant="outline"
                     size="lg"
-                    asChild
+                    onClick={() => handleSubmit("draft")}
                   >
-                    <Link to="/dashboard">{t('form.cancel')}</Link>
+                   Save as Draft
                   </Button>
                 </div>
               </form>

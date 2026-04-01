@@ -15,44 +15,55 @@ const Track = () => {
   const [hasSearched, setHasSearched] = useState(false);
 
   // Mock data
-  const mockRequests = {
-    'JAB-2025-001234': {
-      type: 'service',
-      referenceNumber: 'JAB-2025-001234',
-      category: 'Road Repair',
-      status: 'progress' as const,
-      submittedDate: 'January 5, 2025',
-      lastUpdate: 'January 7, 2025',
-      description: 'Pothole repair request on Main Street near the market',
-      priority: 'Medium',
-      timeline: [
-        { date: 'Jan 5, 2025', status: 'Submitted', description: 'Request received and logged' },
-        { date: 'Jan 6, 2025', status: 'Under Review', description: 'Assigned to roads department' },
-        { date: 'Jan 7, 2025', status: 'In Progress', description: 'Repair team scheduled for Jan 10' },
-      ],
-    },
-    'JAB-CMP-2025-00456': {
-      type: 'complaint',
-      referenceNumber: 'JAB-CMP-2025-00456',
-      category: 'Staff Misconduct',
-      status: 'review' as const,
-      submittedDate: 'January 4, 2025',
-      lastUpdate: 'January 6, 2025',
-      description: 'Complaint about unprofessional behavior at the sector office',
-      priority: 'High',
-      timeline: [
-        { date: 'Jan 4, 2025', status: 'Submitted', description: 'Complaint received' },
-        { date: 'Jan 6, 2025', status: 'Under Review', description: 'Being reviewed by sector leadership' },
-      ],
-    },
-  };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setHasSearched(true);
-    const result = mockRequests[referenceNumber.toUpperCase() as keyof typeof mockRequests];
-    setSearchResult(result || null);
-  };
+
+ const handleSearch = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setHasSearched(true);
+
+  try {
+    let res;
+
+    // Detect type by reference format
+    if (referenceNumber.startsWith("JAB-CMP")) {
+      res = await fetch(`http://localhost:5000/api/complaints/${referenceNumber}`);
+    } else {
+      res = await fetch(`http://localhost:5000/api/services/${referenceNumber}`);
+    }
+
+    if (!res.ok) {
+      setSearchResult(null);
+      return;
+    }
+
+    const result = await res.json();
+
+    const data = result.data;
+
+    // Format data to match your UI
+    setSearchResult({
+      type: result.type,
+      referenceNumber: data.reference_number,
+      category: data.category,
+      status: data.status,
+      submittedDate: new Date(data.created_at).toLocaleDateString(),
+      lastUpdate: new Date(data.created_at).toLocaleDateString(),
+      description: data.description,
+      priority: data.priority,
+      timeline: [
+        {
+          date: new Date(data.created_at).toLocaleDateString(),
+          status: "Submitted",
+          description: "Request received successfully",
+        },
+      ],
+    });
+
+  } catch (err) {
+    console.error(err);
+    setSearchResult(null);
+  }
+};
 
   return (
     <CitizenLayout title={t('track.title')} subtitle="Enter your reference number to check the status of your service request or complaint">
@@ -67,7 +78,7 @@ const Track = () => {
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
                     type="text"
-                    placeholder="e.g., JAB-2025-001234 or JAB-CMP-2025-00456"
+                    placeholder="e.g., JAB-SR-YYYY-XXXXX or JAB-CMP-YYYY-XXXXXX"
                     value={referenceNumber}
                     onChange={(e) => setReferenceNumber(e.target.value)}
                     className="pl-12 h-12 text-base"
@@ -79,7 +90,7 @@ const Track = () => {
                 </Button>
               </form>
               <p className="text-xs text-muted-foreground mt-3">
-                Try: JAB-2025-001234 (service request) or JAB-CMP-2025-00456 (complaint)
+                Try: JAB-SR-2025-XXXXX (service request) or JAB-CMP-2025-XXXXXX (complaint)
               </p>
             </CardContent>
           </Card>

@@ -6,6 +6,7 @@ import {
   Clock, 
   CheckCircle, 
   Users,
+  User,
   Bell,
   Search,
   ChevronRight,
@@ -59,13 +60,15 @@ import {
 } from '@/components/ui/dialog';
 import { useLanguage } from '@/contexts/LanguageContext';
 import StatusBadge from '@/components/StatusBadge';
+import { useEffect } from 'react';
+import axios from 'axios';
 
 interface Case {
   id: string;
   type: 'service' | 'complaint';
   category: string;
   description: string;
-  status: 'submitted' | 'review' | 'progress' | 'resolved';
+  status: 'submitted' | 'review' | 'progress' | 'resolved' | 'draft';
   priority: 'high' | 'medium' | 'low';
   submittedDate: string;
   citizen: string;
@@ -80,10 +83,17 @@ interface StaffMember {
   id: string;
   name: string;
   role: string;
-  avatar?: string;
+  email: string;
+  phone: string;
+  department: string;
+  avatar?: string | null;
   activeCases: number;
   resolvedThisMonth: number;
+  workloadPercent: number;
 }
+
+
+
 
 const StaffDashboard = () => {
   const { t } = useLanguage();
@@ -98,114 +108,144 @@ const StaffDashboard = () => {
   const [activeNav, setActiveNav] = useState('dashboard');
   const [draggedCase, setDraggedCase] = useState<string | null>(null);
 
-  // Mock staff data
-  const currentStaff = {
-    name: 'Jean Pierre Habimana',
-    role: 'Sector Executive Secretary',
-    department: 'Jabana Sector Administration',
+const [workloadData, setWorkloadData] = useState<StaffMember[]>([]);
+
+ const [cases, setCases] = useState<Case[]>([]);
+const [loading, setLoading] = useState(true);
+
+useEffect(() => {
+  const fetchTeam = async () => {
+    try {
+      const token = localStorage.getItem("token"); // your JWT
+      const res = await axios.get("http://localhost:5000/api/staff/team", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      // calculate workloadPercent based on activeCases
+      const dataWithPercent = res.data.map((member: any) => ({
+        ...member,
+        workloadPercent: Math.min((member.activeCases / 10) * 100, 100),
+      }));
+
+      setWorkloadData(dataWithPercent);
+    } catch (err) {
+      console.error("Failed to fetch team", err);
+    }
   };
 
-  const teamMembers: StaffMember[] = [
-    { id: '1', name: 'Alice Mukamana', role: 'Sector Officer', activeCases: 3, resolvedThisMonth: 12 },
-    { id: '2', name: 'Bob Nshimiyimana', role: 'Sector Officer', activeCases: 5, resolvedThisMonth: 8 },
-    { id: '3', name: 'Claire Uwase', role: 'Sector Officer', activeCases: 2, resolvedThisMonth: 15 },
-    { id: '4', name: 'David Mugabo', role: 'Sector Officer', activeCases: 4, resolvedThisMonth: 6 },
-  ];
+  fetchTeam();
+}, []);
 
-  // Mock cases
-  const [cases, setCases] = useState<Case[]>([
-    {
-      id: 'JAB-2025-001234',
-      type: 'service',
-      category: 'Road Repair',
-      description: 'Pothole repair request on Main Street near the market. The pothole is approximately 2 meters wide and poses a safety hazard.',
-      status: 'progress',
-      priority: 'high',
-      submittedDate: 'Jan 5, 2025',
-      citizen: 'Jean B. Uwimana',
-      citizenPhone: '+250 788 123 456',
-      citizenEmail: 'jean.uwimana@email.rw',
-      location: 'Sector 3, Cell 2',
-      assignedTo: 'Alice Mukamana',
-      notes: [
-        { author: 'Alice Mukamana', text: 'Inspected the site. Damage is significant.', date: 'Jan 6, 2025' },
-        { author: 'Bob Nshimiyimana', text: 'Repair team scheduled for next week.', date: 'Jan 7, 2025' },
-      ],
-    },
-    {
-      id: 'JAB-CMP-2025-00456',
-      type: 'complaint',
-      category: 'Staff Misconduct',
-      description: 'Complaint about unprofessional behavior at the sector office during morning hours.',
-      status: 'review',
-      priority: 'high',
-      submittedDate: 'Jan 4, 2025',
-      citizen: 'Anonymous',
-      location: 'Sector Office',
-      assignedTo: null,
-      notes: [],
-    },
-    {
-      id: 'JAB-2025-001235',
-      type: 'service',
-      category: 'Water Issues',
-      description: 'Low water pressure in residential area affecting multiple households.',
-      status: 'submitted',
-      priority: 'medium',
-      submittedDate: 'Jan 8, 2025',
-      citizen: 'Marie Claire N.',
-      citizenPhone: '+250 788 234 567',
-      location: 'Sector 5, Cell 1',
-      assignedTo: null,
-      notes: [],
-    },
-    {
-      id: 'JAB-2025-001236',
-      type: 'service',
-      category: 'Waste Collection',
-      description: 'Missed waste collection on Tuesday schedule for the entire neighborhood.',
-      status: 'submitted',
-      priority: 'low',
-      submittedDate: 'Jan 8, 2025',
-      citizen: 'Patrick Habimana',
-      citizenPhone: '+250 788 345 678',
-      location: 'Sector 2, Cell 4',
-      assignedTo: null,
-      notes: [],
-    },
-    {
-      id: 'JAB-2025-001220',
-      type: 'service',
-      category: 'Electricity',
-      description: 'Street light not working near the school, creating safety concerns at night.',
-      status: 'resolved',
-      priority: 'medium',
-      submittedDate: 'Jan 2, 2025',
-      citizen: 'School Admin',
-      location: 'Sector 1, Cell 3',
-      assignedTo: 'Bob Nshimiyimana',
-      notes: [
-        { author: 'Bob Nshimiyimana', text: 'Light bulb replaced successfully.', date: 'Jan 3, 2025' },
-      ],
-    },
-  ]);
+useEffect(() => {
+  const fetchCases = async () => {
+    try {
+      const token = localStorage.getItem("token");
 
-  const stats = {
-    total: cases.length,
-    new: cases.filter(c => c.status === 'submitted').length,
-    inProgress: cases.filter(c => c.status === 'progress' || c.status === 'review').length,
-    resolved: cases.filter(c => c.status === 'resolved').length,
-    highPriority: cases.filter(c => c.priority === 'high').length,
+      const res = await fetch("http://localhost:5000/api/dashboard", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+
+      console.log("API DATA:", data);
+
+//       const formatStatus = (status: string): Case['status'] => {
+//   switch (status) {
+//     case 'submitted':
+//     case 'review':
+//     case 'progress':
+//     case 'resolved':
+//     case 'draft':
+//       return status;
+//     default:
+//       return 'draft'; // fallback
+//   }
+// };
+
+      // 🔥 merge services + complaints into one list
+      const formattedCases: Case[] = [
+        ...(data.services || []).map((s: any) => ({
+          id: s.reference_number,
+          type: "service",
+          category: s.category,
+          description: s.description,
+          status: s.status,
+          priority: s.priority || "medium",
+          submittedDate: s.createdAt,
+          citizen: s.user ? s.user.name : "Anonymous",
+          citizenPhone: s.user?.phone,
+          citizenEmail: s.user?.email,
+          location: s.location || "Unknown",
+          assignedTo: s.assignedTo || null,
+          notes: s.notes || [],
+        })),
+        ...(data.complaints || []).map((c: any) => ({
+          id: c.reference_number,
+          type: "complaint",
+          category: c.category,
+          description: c.description,
+          status:c.status,
+          priority: c.priority || "medium",
+          submittedDate: c.createdAt,
+        citizen: c.user ? c.user.name : "Anonymous",
+          citizenPhone: c.user?.phone,
+          citizenEmail: c.user?.email,
+          location: c.location || "Unknown",
+          assignedTo: c.assignedTo || null,
+          notes: c.notes || [],
+        })),
+      ];
+
+      setCases(formattedCases);
+    } catch (error) {
+      console.error("Error fetching cases:", error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  fetchCases();
+}, []);
+
+if (loading) {
+  return <div>Loading dashboard...</div>;
+}
+const validCases = cases.filter(c => c.status !== "draft");
+
+ const stats = {
+  total: validCases.length,
+  new: validCases.filter(c => c.status === 'submitted').length,
+  inProgress: validCases.filter(c => c.status === 'progress' || c.status === 'review').length,
+  resolved: validCases.filter(c => c.status === 'resolved').length,
+  highPriority: validCases.filter(c => c.priority === 'high').length,
+};
+
+  const storedUser = localStorage.getItem("user");
+const currentUser = storedUser ? JSON.parse(storedUser) : null;
 
   const filteredCases = cases.filter(c => {
+      if (c.status === "draft") return false;
+
     const matchesSearch = 
-      c.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.id || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.citizen.toLowerCase().includes(searchQuery.toLowerCase());
+      (c.citizen || "").toLowerCase().includes(searchQuery.toLowerCase());
     const matchesPriority = selectedPriority === 'all' || c.priority === selectedPriority;
     return matchesSearch && matchesPriority;
   });
+
+  const handleLogout = () => {
+  // remove stored auth data
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+
+  // redirect to login page
+  navigate("/login");
+};
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -222,7 +262,7 @@ const StaffDashboard = () => {
         if (c.id === selectedCase.id) {
           return {
             ...c,
-            notes: [...c.notes, { author: currentStaff.name, text: newNote, date: 'Jan 11, 2025' }],
+            notes: [...c.notes, { author: currentUser.name, text: newNote, date: 'Jan 11, 2025' }],
           };
         }
         return c;
@@ -230,26 +270,26 @@ const StaffDashboard = () => {
       setCases(updatedCases);
       setSelectedCase({
         ...selectedCase,
-        notes: [...selectedCase.notes, { author: currentStaff.name, text: newNote, date: 'Jan 11, 2025' }],
+        notes: [...selectedCase.notes, { author: currentUser.name, text: newNote, date: 'Jan 11, 2025' }],
       });
       setNewNote('');
     }
   };
 
-  const handleAssign = (staffId: string) => {
-    const staff = teamMembers.find(m => m.id === staffId);
-    if (selectedCase && staff) {
-      const updatedCases = cases.map(c => {
-        if (c.id === selectedCase.id) {
-          return { ...c, assignedTo: staff.name, status: 'review' as const };
-        }
-        return c;
-      });
-      setCases(updatedCases);
-      setSelectedCase({ ...selectedCase, assignedTo: staff.name, status: 'review' });
-      setAssignDialogOpen(false);
-    }
-  };
+const handleAssign = (staffId: string) => {
+  const staff = workloadData.find(m => m.id === staffId);
+  if (selectedCase && staff) {
+    const updatedCases = cases.map(c => {
+      if (c.id === selectedCase.id) {
+        return { ...c, assignedTo: staff.name, status: 'review' as const };
+      }
+      return c;
+    });
+    setCases(updatedCases);
+    setSelectedCase({ ...selectedCase, assignedTo: staff.name, status: 'review' });
+    setAssignDialogOpen(false);
+  }
+};
 
   const handleStatusChange = (newStatus: 'submitted' | 'review' | 'progress' | 'resolved') => {
     if (selectedCase) {
@@ -264,34 +304,36 @@ const StaffDashboard = () => {
     }
   };
 
-  const handleDragStart = (caseId: string) => {
-    setDraggedCase(caseId);
-  };
+ // Dragging a case
+const handleDragStart = (caseId: string) => {
+  setDraggedCase(caseId);
+};
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
+// Allow dropping
+const handleDragOver = (e: React.DragEvent) => {
+  e.preventDefault();
+};
 
-  const handleDrop = (staffId: string) => {
-    if (draggedCase) {
-      const staff = teamMembers.find(m => m.id === staffId);
-      if (staff) {
-        const updatedCases = cases.map(c => {
-          if (c.id === draggedCase) {
-            return { ...c, assignedTo: staff.name, status: 'review' as const };
-          }
-          return c;
-        });
-        setCases(updatedCases);
-      }
-      setDraggedCase(null);
-    }
-  };
+// Assign dragged case to a staff member
+const handleDrop = (staffId: string) => {
+  if (!draggedCase) return;
 
-  const workloadData = teamMembers.map(member => ({
-    ...member,
-    workloadPercent: (member.activeCases / 10) * 100,
-  }));
+  const staff = workloadData.find((m) => m.id === staffId);
+  if (staff) {
+    const updatedCases = cases.map((c) =>
+      c.id === draggedCase ? { ...c, assignedTo: staff.name, status: 'review' as const } : c
+    );
+    setCases(updatedCases);
+
+    // Update workloadData locally for UX (optional)
+    const updatedWorkload = workloadData.map((m) =>
+      m.id === staffId ? { ...m, activeCases: m.activeCases + 1, workloadPercent: Math.min(((m.activeCases + 1) / 10) * 100, 100) } : m
+    );
+    setWorkloadData(updatedWorkload);
+  }
+
+  setDraggedCase(null);
+};
 
   return (
     <div className="min-h-screen flex bg-muted/30">
@@ -366,21 +408,41 @@ const StaffDashboard = () => {
             </Link>
           </nav>
 
-          {/* User */}
-          <div className="p-4 border-t border-sidebar-border">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-sidebar-accent flex items-center justify-center">
-                <UserCircle className="h-6 w-6" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">{currentStaff.name}</p>
-                <p className="text-xs text-sidebar-foreground/70 truncate">{currentStaff.role}</p>
-              </div>
-              <Button variant="ghost" size="icon" className="text-sidebar-foreground/70 hover:text-sidebar-foreground">
-                <LogOut className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
+      {/* User */}
+<div className="p-4 border-t border-sidebar-border">
+  {currentUser && (
+    <div className="flex items-center gap-3">
+      {/* Avatar */}
+      <div className="w-10 h-10 rounded-full bg-sidebar-accent flex items-center justify-center overflow-hidden">
+        {currentUser.avatar ? (
+          <img
+            src={`http://localhost:5000/uploads/${currentUser.avatar}`}
+            alt="avatar"
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <User className="h-5 w-5 text-sidebar-foreground/70" />
+        )}
+      </div>
+
+      {/* Name & Role */}
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm truncate">{currentUser.name}</p>
+        <p className="text-xs text-sidebar-foreground/70 truncate uppercase">{currentUser.role}</p>
+      </div>
+
+      {/* Logout Button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={handleLogout}
+        className="text-sidebar-foreground/70 hover:text-sidebar-foreground"
+      >
+        <LogOut className="h-5 w-5" />
+      </Button>
+    </div>
+  )}
+</div>
         </div>
       </aside>
 
@@ -432,7 +494,7 @@ const StaffDashboard = () => {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">New Cases</p>
+                    <p className="text-sm text-muted-foreground">All Cases</p>
                     <p className="text-2xl font-bold text-foreground">{stats.new}</p>
                   </div>
                   <div className="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center">
@@ -440,8 +502,8 @@ const StaffDashboard = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 mt-2 text-xs text-warning">
-                  <ArrowUp className="h-3 w-3" />
-                  <span>2 new today</span>
+                  {/* <ArrowUp className="h-3 w-3" />
+                  <span>2 new today</span> */}
                 </div>
               </CardContent>
             </Card>
@@ -528,7 +590,10 @@ const StaffDashboard = () => {
                           className={`p-4 hover:bg-muted/30 transition-colors cursor-pointer ${
                             draggedCase === caseItem.id ? 'opacity-50' : ''
                           }`}
-                          onClick={() => navigate(`/staff/cases/${caseItem.id}`)}
+                        onClick={() => {
+  setSelectedCase(caseItem);
+  setCitizenPanelOpen(true);
+}}
                         >
                           <div className="flex items-start gap-3">
                             <div className="mt-1 cursor-grab">
@@ -579,44 +644,46 @@ const StaffDashboard = () => {
             {/* Workload Distribution & Team Assignment */}
             <div className="space-y-6">
               {/* Workload Distribution */}
-              <Card className="border-border">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-primary" />
-                    Workload Distribution
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {workloadData.map((member) => (
-                    <div
-                      key={member.id}
-                      onDragOver={handleDragOver}
-                      onDrop={() => handleDrop(member.id)}
-                      className="p-3 rounded-lg border border-border hover:border-primary/50 transition-colors"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <UserCircle className="h-4 w-4 text-primary" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">{member.name}</p>
-                            <p className="text-xs text-muted-foreground">{member.role}</p>
-                          </div>
-                        </div>
-                        <Badge variant="outline">{member.activeCases} active</Badge>
-                      </div>
-                      <Progress value={member.workloadPercent} className="h-2" />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {member.resolvedThisMonth} resolved this month
-                      </p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
+<Card className="border-border">
+  <CardHeader>
+    <CardTitle className="text-lg flex items-center gap-2">
+      <TrendingUp className="h-5 w-5 text-primary" />
+      Workload Distribution
+    </CardTitle>
+  </CardHeader>
+  <CardContent className="space-y-4 max-h-[520px] overflow-y-auto">
+    {workloadData.map((member) => (
+      <div
+        key={member.id}
+        onDragOver={handleDragOver}
+        onDrop={() => handleDrop(member.id)}
+        className={`p-3 rounded-lg border border-border hover:border-primary/50 transition-colors ${
+          member.workloadPercent >= 100 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+        }`}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+              <UserCircle className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">{member.name}</p>
+              <p className="text-xs text-muted-foreground">{member.role}</p>
+            </div>
+          </div>
+          <Badge variant="outline">{member.activeCases} active</Badge>
+        </div>
+        <Progress value={member.workloadPercent} className="h-2" />
+        <p className="text-xs text-muted-foreground mt-1">
+          {member.resolvedThisMonth} resolved this month
+        </p>
+      </div>
+    ))}
+  </CardContent>
+</Card>
 
               {/* Quick Stats */}
-              <Card className="border-border">
+              {/* <Card className="border-border">
                 <CardHeader>
                   <CardTitle className="text-lg">Today's Activity</CardTitle>
                 </CardHeader>
@@ -634,7 +701,7 @@ const StaffDashboard = () => {
                     <span className="font-bold text-destructive">1</span>
                   </div>
                 </CardContent>
-              </Card>
+              </Card> */}
             </div>
           </div>
         </main>
@@ -779,7 +846,7 @@ const StaffDashboard = () => {
             <DialogTitle>Assign Case</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-4">
-            {teamMembers.map((member) => (
+            {workloadData.map((member) => (
               <div
                 key={member.id}
                 className="flex items-center justify-between p-3 rounded-lg border border-border hover:border-primary cursor-pointer transition-colors"

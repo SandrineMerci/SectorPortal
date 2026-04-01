@@ -12,7 +12,7 @@ import {
   LogOut,
   Menu,
   X,
-  UserCircle,
+  User,
   MapPin,
   MessageSquare,
   Send,
@@ -68,11 +68,7 @@ const OfficerDashboard = () => {
   const [newNote, setNewNote] = useState('');
 
   // Mock officer data
-  const currentOfficer = {
-    name: 'Bob Nshimiyimana',
-    role: 'Sector Officer',
-    department: 'Field Operations',
-  };
+ 
 
   // Mock assigned cases (only cases assigned to this officer)
   const [myCases, setMyCases] = useState<Case[]>([
@@ -161,13 +157,23 @@ const OfficerDashboard = () => {
     }
   };
 
+  const handleLogout = () => {
+  // remove stored auth data
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+
+  // redirect to login page
+  navigate("/login");
+};
+  const storedUser = localStorage.getItem("user");
+const currentUser = storedUser ? JSON.parse(storedUser) : null;
   const handleAddNote = () => {
     if (selectedCase && newNote.trim()) {
       const updatedCases = myCases.map(c => {
         if (c.id === selectedCase.id) {
           return {
             ...c,
-            notes: [...c.notes, { author: currentOfficer.name, text: newNote, date: 'Jan 11, 2025' }],
+            notes: [...c.notes, { author: currentUser.name, text: newNote, date: 'Jan 11, 2025' }],
           };
         }
         return c;
@@ -175,7 +181,7 @@ const OfficerDashboard = () => {
       setMyCases(updatedCases);
       setSelectedCase({
         ...selectedCase,
-        notes: [...selectedCase.notes, { author: currentOfficer.name, text: newNote, date: 'Jan 11, 2025' }],
+        notes: [...selectedCase.notes, { author: currentUser.name, text: newNote, date: 'Jan 11, 2025' }],
       });
       setNewNote('');
     }
@@ -245,22 +251,39 @@ const OfficerDashboard = () => {
             </Link>
           </nav>
 
-          {/* User */}
-          <div className="p-4 border-t border-sidebar-border">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-sidebar-accent flex items-center justify-center">
-                <UserCircle className="h-6 w-6" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">{currentOfficer.name}</p>
-                <p className="text-xs text-sidebar-foreground/70 truncate">{currentOfficer.role}</p>
-              </div>
-              <Button variant="ghost" size="icon" className="text-sidebar-foreground/70 hover:text-sidebar-foreground">
-                <LogOut className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
-        </div>
+        {/* User */}
+<div className="p-4 border-t border-sidebar-border">
+  {currentUser ? (
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-full bg-sidebar-accent flex items-center justify-center">
+        {currentUser.avatar ? (
+          <img
+            src={`http://localhost:5000/uploads/${currentUser.avatar}`}
+            alt="avatar"
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <User className="h-5 w-5" />
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm truncate">{currentUser.name}</p>
+        <p className="text-xs text-sidebar-foreground/70 truncate uppercase">{currentUser.role}</p>
+      </div>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={handleLogout}
+        className="text-sidebar-foreground/70 hover:text-sidebar-foreground"
+      >
+        <LogOut className="h-5 w-5" />
+      </Button>
+    </div>
+  ) : null} {/* <-- properly close the ternary here */}
+</div>
+</div>
       </aside>
 
       {/* Overlay */}
