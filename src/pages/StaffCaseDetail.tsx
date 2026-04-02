@@ -44,7 +44,7 @@ interface Case {
   type: 'service' | 'complaint';
   category: string;
   description: string;
-  status: 'submitted' | 'review' | 'progress' | 'resolved';
+  status: 'submitted' | 'review' | 'progress' | 'resolved' | 'closed';
   priority: 'high' | 'medium' | 'low';
   submittedDate: string;
   citizen: string;
@@ -53,6 +53,18 @@ interface Case {
   location: string;
   assignedTo: string | null;
   notes: { author: string; text: string; date: string }[];
+}
+
+interface StaffMember {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+  phone: string;
+  department: string;
+  activeCases: number;
+  resolvedThisMonth: number;
+  status: 'available' | 'busy' | 'offline';
 }
 
 const StaffCaseDetail = () => {
@@ -68,7 +80,8 @@ const currentUser = storedUser ? JSON.parse(storedUser) : null;
   // Find the case by ID
  const [caseData, setCaseData] = useState<Case | null>(null);
 const [loading, setLoading] = useState(true);
-  
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+const [teamMembers, setTeamMembers] = useState<StaffMember[]>([]);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -83,17 +96,56 @@ const [loading, setLoading] = useState(true);
     if (caseData && newNote.trim()) {
       setCaseData({
         ...caseData,
-        notes: [...caseData.notes, { author: currentUser.name, text: newNote, date: 'Jan 11, 2025' }],
+        notes: [...caseData.notes, { author: currentUser?.name || 'Unknown', text: newNote, date: new Date().toLocaleString() }],
       });
       setNewNote('');
     }
   };
 
-  const handleStatusChange = (newStatus: 'submitted' | 'review' | 'progress' | 'resolved') => {
+  const handleStatusChange = (newStatus: 'submitted' | 'review' | 'progress' | 'resolved' | 'closed') => {
     if (caseData) {
       setCaseData({ ...caseData, status: newStatus });
     }
   };
+
+  const handleAssign = (staffId: string) => {
+  const staff = teamMembers.find(m => m.id === staffId);
+  if (caseData && staff) {
+    setCaseData({ ...caseData, assignedTo: staff.name, status: 'review' });
+    setAssignDialogOpen(false);
+
+    // Optionally, send update to backend
+    const token = localStorage.getItem("token");
+    fetch(`http://localhost:5000/api/cases/${caseData.id}/assign`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ assignedTo: staff.id })
+    }).catch(console.error);
+  }
+};
+
+  useEffect(() => {
+  const fetchTeam = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`http://localhost:5000/api/staff/team`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch team");
+      const data = await res.json();
+      const officers = data.filter((m: any) => m.role.toUpperCase() === 'OFFICER');
+      setTeamMembers(officers);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  fetchTeam();
+}, []);
+  
  useEffect(() => {
   const fetchCase = async () => {
     try {
@@ -345,47 +397,65 @@ if (loading) {
                 </div>
 
                 {/* Assignment */}
-                <div className="border-t border-border pt-6">
-                  <h4 className="text-sm font-medium mb-3">Assigned To</h4>
-                  {caseData.assignedTo ? (
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <UserCircle className="h-5 w-5 text-primary" />
-                        </div>
-                        <span className="font-medium">{caseData.assignedTo}</span>
-                      </div>
-                      <Button variant="outline" size="sm" asChild>
-                        <Link to={`/staff/cases/${caseData.id}/assign`}>
-                          Reassign
-                        </Link>
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button variant="outline" asChild>
-                      <Link to={`/staff/cases/${caseData.id}/assign`}>
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Assign Staff
-                      </Link>
-                    </Button>
-                  )}
-                </div>
+            <div className="border-t border-border pt-6">
+  <h4 className="text-sm font-medium mb-3">Assigned To</h4>
+  <div className="flex items-center justify-between">
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+        <UserCircle className="h-5 w-5 text-primary" />
+      </div>
+      <span className="font-medium">{caseData.assignedTo || 'Not Assigned'}</span>
+    </div>
+    <Button variant="outline" size="sm" onClick={() => setAssignDialogOpen(true)}>
+      Assign
+    </Button>
+  </div>
+
+  {assignDialogOpen && (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-lg w-96">
+        <h3 className="font-bold mb-4">Assign Staff</h3>
+     <Select onValueChange={handleAssign}>
+  <SelectTrigger className="w-full">
+    <SelectValue placeholder="Select staff..." />
+  </SelectTrigger>
+  <SelectContent>
+    {teamMembers.map((staff) => (
+      <SelectItem key={staff.id} value={staff.id}>
+        {staff.name} — {staff.department}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+        <Button className="mt-4" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
+      </div>
+    </div>
+  )}
+</div>
 
                 {/* Status Update */}
-                <div className="border-t border-border pt-6">
-                  <h4 className="text-sm font-medium mb-3">Update Status</h4>
-                  <Select value={caseData.status} onValueChange={(val) => handleStatusChange(val as any)}>
-                    <SelectTrigger className="w-full md:w-64">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="submitted">Submitted</SelectItem>
-                      <SelectItem value="review">In Review</SelectItem>
-                      <SelectItem value="progress">In Progress</SelectItem>
-                      <SelectItem value="resolved">Resolved</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+             <div className="border-t border-border pt-6">
+  <h4 className="text-sm font-medium mb-3">Update Status</h4>
+  <Select
+    value={caseData.status}
+    onValueChange={(val: string) =>
+      handleStatusChange(
+        val as 'submitted' | 'review' | 'progress' | 'resolved' | 'closed'
+      )
+    }
+  >
+    <SelectTrigger className="w-full md:w-64">
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="submitted">Submitted</SelectItem>
+      <SelectItem value="review">In Review</SelectItem>
+      <SelectItem value="progress">In Progress</SelectItem>
+      <SelectItem value="resolved">Resolved</SelectItem>
+      <SelectItem value="closed">Closed</SelectItem>
+    </SelectContent>
+  </Select>
+</div>
               </CardContent>
             </Card>
 

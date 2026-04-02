@@ -175,7 +175,7 @@ useEffect(() => {
           description: s.description,
           status: s.status,
           priority: s.priority || "medium",
-          submittedDate: s.createdAt,
+         submittedDate: new Date(s.created_at).toLocaleString(), 
           citizen: s.user ? s.user.name : "Anonymous",
           citizenPhone: s.user?.phone,
           citizenEmail: s.user?.email,
@@ -190,7 +190,7 @@ useEffect(() => {
           description: c.description,
           status:c.status,
           priority: c.priority || "medium",
-          submittedDate: c.createdAt,
+          submittedDate: new Date(c.created_at).toLocaleString(), 
         citizen: c.user ? c.user.name : "Anonymous",
           citizenPhone: c.user?.phone,
           citizenEmail: c.user?.email,
@@ -255,14 +255,14 @@ const currentUser = storedUser ? JSON.parse(storedUser) : null;
       default: return 'bg-muted text-muted-foreground';
     }
   };
-
+ const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const handleAddNote = () => {
     if (selectedCase && newNote.trim()) {
       const updatedCases = cases.map(c => {
         if (c.id === selectedCase.id) {
           return {
             ...c,
-            notes: [...c.notes, { author: currentUser.name, text: newNote, date: 'Jan 11, 2025' }],
+            notes: [...c.notes, { author: currentUser.name, text: newNote, date: today }],
           };
         }
         return c;
@@ -270,7 +270,8 @@ const currentUser = storedUser ? JSON.parse(storedUser) : null;
       setCases(updatedCases);
       setSelectedCase({
         ...selectedCase,
-        notes: [...selectedCase.notes, { author: currentUser.name, text: newNote, date: 'Jan 11, 2025' }],
+       
+notes: [...selectedCase.notes, { author: currentUser.name, text: newNote, date: today }],
       });
       setNewNote('');
     }
@@ -579,65 +580,67 @@ const handleDrop = (staffId: string) => {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <ScrollArea className="h-[500px]">
-                    <div className="divide-y divide-border">
-                      {filteredCases.map((caseItem) => (
-                        <div
-                          key={caseItem.id}
-                          draggable
-                          onDragStart={() => handleDragStart(caseItem.id)}
-                          className={`p-4 hover:bg-muted/30 transition-colors cursor-pointer ${
-                            draggedCase === caseItem.id ? 'opacity-50' : ''
-                          }`}
-                        onClick={() => {
-  setSelectedCase(caseItem);
-  setCitizenPanelOpen(true);
-}}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="mt-1 cursor-grab">
-                              <GripVertical className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                              caseItem.type === 'service' ? 'bg-primary/10' : 'bg-destructive/10'
-                            }`}>
-                              {caseItem.type === 'service' ? (
-                                <FileText className="h-5 w-5 text-primary" />
-                              ) : (
-                                <AlertCircle className="h-5 w-5 text-destructive" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-medium text-sm">{caseItem.id}</span>
-                                <Badge variant="outline" className={`text-xs ${getPriorityColor(caseItem.priority)}`}>
-                                  {caseItem.priority}
-                                </Badge>
-                              </div>
-                              <p className="text-sm font-medium text-foreground">{caseItem.category}</p>
-                              <p className="text-sm text-muted-foreground truncate">{caseItem.description}</p>
-                              <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                                <span className="flex items-center gap-1">
-                                  <UserCircle className="h-3 w-3" />
-                                  {caseItem.citizen}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <MapPin className="h-3 w-3" />
-                                  {caseItem.location}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex flex-col items-end gap-2">
-                              <StatusBadge status={caseItem.status} />
-                              <span className="text-xs text-muted-foreground">{caseItem.submittedDate}</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </CardContent>
+               <CardContent className="p-0">
+  <ScrollArea className="h-[500px]">
+    <div className="divide-y divide-border">
+      {filteredCases.map((caseItem, idx) => (
+        <div
+          key={`${caseItem.id}-${idx}`} // ensure unique key
+          draggable
+          onDragStart={() => handleDragStart(caseItem.id)}
+          className={`p-4 hover:bg-muted/30 transition-colors cursor-pointer ${
+            draggedCase === caseItem.id ? 'opacity-50' : ''
+          }`}
+          onClick={() => navigate(`/staff/cases/${caseItem.id}`)} // navigate on click
+        >
+          <div className="flex items-start gap-3">
+            <div className="mt-1 cursor-grab">
+              <GripVertical className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div
+              className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                caseItem.type === 'service' ? 'bg-primary/10' : 'bg-destructive/10'
+              }`}
+            >
+              {caseItem.type === 'service' ? (
+                <FileText className="h-5 w-5 text-primary" />
+              ) : (
+                <AlertCircle className="h-5 w-5 text-destructive" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-medium text-sm">{caseItem.id}</span>
+                <Badge
+                  variant="outline"
+                  className={`text-xs ${getPriorityColor(caseItem.priority)}`}
+                >
+                  {caseItem.priority}
+                </Badge>
+              </div>
+              <p className="text-sm font-medium text-foreground">{caseItem.category}</p>
+              <p className="text-sm text-muted-foreground truncate">{caseItem.description}</p>
+              <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <UserCircle className="h-3 w-3" />
+                  {caseItem.location}
+                </span>
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  {caseItem.submittedDate}
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-2">
+              <StatusBadge status={caseItem.status} />
+              {/* <span className="text-xs text-muted-foreground">{caseItem.submittedDate}</span> */}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </ScrollArea>
+</CardContent>
               </Card>
             </div>
 

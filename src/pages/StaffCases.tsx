@@ -228,7 +228,7 @@ useEffect(() => {
     description: s.description,
     status: s.status,
     priority: s.priority || "medium",
-    submittedDate: s.createdAt,
+    submittedDate: new Date(s.created_at).toLocaleString(), 
     citizen: s.user ? s.user.name : "Anonymous",
     citizenPhone: s.user?.phone,
     citizenEmail: s.user?.email,
@@ -243,7 +243,7 @@ useEffect(() => {
     description: c.description,
     status: c.status,
     priority: c.priority || "medium",
-    submittedDate: c.createdAt,
+   submittedDate: new Date(c.created_at).toLocaleString(), 
     citizen: c.user ? c.user.name : "Anonymous",
     citizenPhone: c.user?.phone,
     citizenEmail: c.user?.email,
@@ -477,8 +477,8 @@ useEffect(() => {
   <div
     key={`${caseItem.id}-${idx}`} // combines id + index to guarantee uniqueness
     className="p-4 border border-border rounded-lg hover:border-primary/50 cursor-pointer transition-colors"
-    onClick={() => navigate(`/staff/cases/${caseItem.id}`)}
-  >
+    onClick={() => navigate(`/staff/cases/${caseItem.id}`)}>
+  
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-2">
