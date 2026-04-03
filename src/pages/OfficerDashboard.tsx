@@ -42,19 +42,22 @@ import {
 } from '@/components/ui/sheet';
 import { useLanguage } from '@/contexts/LanguageContext';
 import StatusBadge from '@/components/StatusBadge';
+import { useEffect } from 'react';
 
 interface Case {
   id: string;
   type: 'service' | 'complaint';
   category: string;
   description: string;
-  status: 'submitted' | 'review' | 'progress' | 'resolved';
+status: 'submitted' | 'under_review' | 'progress' | 'resolved' | 'closed';
   priority: 'high' | 'medium' | 'low';
   submittedDate: string;
   citizen: string;
   citizenPhone?: string;
   citizenEmail?: string;
   location: string;
+  assignedTo: string | null;
+  resolvedDate?: string;
   notes: { author: string; text: string; date: string }[];
 }
 
@@ -67,77 +70,25 @@ const OfficerDashboard = () => {
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [newNote, setNewNote] = useState('');
 
-  // Mock officer data
- 
+const [myCases, setMyCases] = useState<Case[]>([]);
+const [loading, setLoading] = useState(true);
+  
+const now = new Date();
+const currentMonth = now.getMonth(); // 0-11
+const currentYear = now.getFullYear();
 
-  // Mock assigned cases (only cases assigned to this officer)
-  const [myCases, setMyCases] = useState<Case[]>([
-    {
-      id: 'JAB-2025-001234',
-      type: 'service',
-      category: 'Road Repair',
-      description: 'Pothole repair request on Main Street near the market. The pothole is approximately 2 meters wide and poses a safety hazard.',
-      status: 'progress',
-      priority: 'high',
-      submittedDate: 'Jan 5, 2025',
-      citizen: 'Jean B. Uwimana',
-      citizenPhone: '+250 788 123 456',
-      citizenEmail: 'jean.uwimana@email.rw',
-      location: 'Sector 3, Cell 2',
-      notes: [
-        { author: 'Sector Executive Secretary', text: 'Please prioritize this case.', date: 'Jan 5, 2025' },
-        { author: 'Bob Nshimiyimana', text: 'Inspected the site. Damage is significant.', date: 'Jan 6, 2025' },
-      ],
-    },
-    {
-      id: 'JAB-2025-001220',
-      type: 'service',
-      category: 'Electricity',
-      description: 'Street light not working near the school, creating safety concerns at night.',
-      status: 'review',
-      priority: 'medium',
-      submittedDate: 'Jan 2, 2025',
-      citizen: 'School Admin',
-      location: 'Sector 1, Cell 3',
-      notes: [],
-    },
-    {
-      id: 'JAB-2025-001240',
-      type: 'service',
-      category: 'Water Issues',
-      description: 'Broken water pipe causing flooding in the residential area.',
-      status: 'progress',
-      priority: 'high',
-      submittedDate: 'Jan 9, 2025',
-      citizen: 'Marie Uwase',
-      citizenPhone: '+250 788 456 789',
-      location: 'Sector 4, Cell 1',
-      notes: [
-        { author: 'Sector Executive Secretary', text: 'Urgent - coordinate with water authority.', date: 'Jan 9, 2025' },
-      ],
-    },
-    {
-      id: 'JAB-2025-001215',
-      type: 'complaint',
-      category: 'Noise Complaint',
-      description: 'Excessive noise from construction site during night hours.',
-      status: 'resolved',
-      priority: 'low',
-      submittedDate: 'Jan 1, 2025',
-      citizen: 'Anonymous',
-      location: 'Sector 2, Cell 3',
-      notes: [
-        { author: 'Bob Nshimiyimana', text: 'Spoke with construction company. They agreed to limit work hours.', date: 'Jan 2, 2025' },
-      ],
-    },
-  ]);
-
-  const stats = {
-    total: myCases.length,
-    inProgress: myCases.filter(c => c.status === 'progress' || c.status === 'review').length,
-    resolved: myCases.filter(c => c.status === 'resolved').length,
-    resolvedThisMonth: 8,
-  };
+const stats = {
+  total: myCases.length,
+  inProgress: myCases.filter(
+    c => c.status === 'progress' || c.status === 'under_review'
+  ).length,
+  resolved: myCases.filter(c => c.status === 'resolved').length,
+  resolvedThisMonth: myCases.filter(c => {
+    if (c.status !== 'resolved' || !c.resolvedDate) return false;
+    const resolved = new Date(c.resolvedDate);
+    return resolved.getMonth() === currentMonth && resolved.getFullYear() === currentYear;
+  }).length,
+};
 
   const filteredCases = myCases.filter(c => {
     const matchesSearch = 
@@ -167,13 +118,14 @@ const OfficerDashboard = () => {
 };
   const storedUser = localStorage.getItem("user");
 const currentUser = storedUser ? JSON.parse(storedUser) : null;
+
   const handleAddNote = () => {
     if (selectedCase && newNote.trim()) {
       const updatedCases = myCases.map(c => {
         if (c.id === selectedCase.id) {
           return {
             ...c,
-            notes: [...c.notes, { author: currentUser.name, text: newNote, date: 'Jan 11, 2025' }],
+            notes: [...c.notes, { author: currentUser?.name || "Officer", text: newNote, date: 'Jan 11, 2025' }],
           };
         }
         return c;
@@ -181,24 +133,129 @@ const currentUser = storedUser ? JSON.parse(storedUser) : null;
       setMyCases(updatedCases);
       setSelectedCase({
         ...selectedCase,
-        notes: [...selectedCase.notes, { author: currentUser.name, text: newNote, date: 'Jan 11, 2025' }],
+        notes: [...selectedCase.notes, { author: currentUser?.name || "Officer", text: newNote, date: 'Jan 11, 2025' }],
       });
       setNewNote('');
     }
   };
 
-  const handleStatusChange = (newStatus: 'submitted' | 'review' | 'progress' | 'resolved') => {
-    if (selectedCase) {
-      const updatedCases = myCases.map(c => {
-        if (c.id === selectedCase.id) {
-          return { ...c, status: newStatus };
-        }
-        return c;
+const handleStatusChange = async (newStatus: Case['status']) => {
+  if (!selectedCase) return;
+
+  try {
+    const token = localStorage.getItem("token");
+
+    await fetch(
+      `http://localhost:5000/api/dashboard/cases/${selectedCase.id}/status`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          status: newStatus,
+          type: selectedCase.type,
+        }),
+      }
+    );
+
+    const updatedCases = myCases.map(c =>
+      c.id === selectedCase.id ? { ...c, status: newStatus } : c
+    );
+
+    setMyCases(updatedCases);
+    setSelectedCase({ ...selectedCase, status: newStatus });
+
+  } catch (err) {
+    console.error("Status update failed:", err);
+  }
+};
+
+useEffect(() => {
+  const fetchMyCases = async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      const res = await fetch("http://localhost:5000/api/dashboard", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
-      setMyCases(updatedCases);
-      setSelectedCase({ ...selectedCase, status: newStatus });
+
+      const data = await res.json();
+
+const formatStatus = (status: string): Case['status'] => {
+  const normalized = status?.toLowerCase().replace(" ", "_");
+
+  switch (normalized) {
+    case "under_review":
+    case "progress":
+    case "submitted":
+    case "resolved":
+    case "closed":
+      return normalized as Case['status'];
+
+    default:
+      return "submitted";
+  }
+};
+
+      const allCases: Case[] = [
+        ...(data.services || []).map((s: any) => ({
+          id: s.reference_number,
+          type: "service",
+          category: s.category,
+          description: s.description,
+          status: formatStatus(s.status),
+          priority: s.priority || "medium",
+          submittedDate: new Date(s.created_at).toLocaleString(),
+       citizen: s.citizen || "Anonymous",
+citizenPhone: s.phone || "",
+citizenEmail: s.email || "",
+          location: s.location || "Unknown",
+       assignedTo: s.assigned_to || null, // store ID only
+       resolvedDate: s.status.toLowerCase() === "resolved" ? new Date(s.updated_at).toISOString() : undefined,
+          notes: s.notes || [],
+        })),
+        ...(data.complaints || []).map((c: any) => ({
+          id: c.reference_number,
+          type: "complaint",
+          category: c.category,
+          description: c.description,
+          status: formatStatus(c.status),
+          priority: c.priority || "medium",
+          submittedDate: new Date(c.created_at).toLocaleString(),
+        citizen: c.citizen || "Anonymous",
+citizenPhone: c.phone || "",
+citizenEmail: c.email || "",
+          location: c.location || "Unknown",
+         assignedTo: c.assigned_to || null, // store ID only
+         resolvedDate: c.status.toLowerCase() === "resolved" ? new Date(c.updated_at).toISOString() : undefined,
+          notes: c.notes || [],
+        })),
+      ];
+
+      // ✅ FILTER ONLY THIS OFFICER'S CASES
+      const storedUser = localStorage.getItem("user");
+      const currentUser = storedUser ? JSON.parse(storedUser) : null;
+
+    const myAssignedCases = allCases.filter(
+  (c) => c.assignedTo === currentUser?.id
+);
+
+      setMyCases(myAssignedCases);
+
+    } catch (error) {
+      console.error("Error fetching officer cases:", error);
+    } finally {
+      setLoading(false);
     }
   };
+
+  fetchMyCases();
+}, []);
+
 
   return (
     <div className="min-h-screen flex bg-muted/30">
@@ -313,7 +370,7 @@ const currentUser = storedUser ? JSON.parse(storedUser) : null;
                 <p className="text-sm text-muted-foreground hidden sm:block">View and manage your assigned cases</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            {/* <div className="flex items-center gap-3">
               <Button variant="outline" size="icon" className="relative" asChild>
                 <Link to="/notifications">
                   <Bell className="h-5 w-5" />
@@ -322,7 +379,7 @@ const currentUser = storedUser ? JSON.parse(storedUser) : null;
                   </span>
                 </Link>
               </Button>
-            </div>
+            </div> */}
           </div>
         </header>
 
@@ -401,7 +458,7 @@ const currentUser = storedUser ? JSON.parse(storedUser) : null;
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="review">Under Review</SelectItem>
+                <SelectItem value="under_review">Under Review</SelectItem>
                 <SelectItem value="progress">In Progress</SelectItem>
                 <SelectItem value="resolved">Resolved</SelectItem>
               </SelectContent>
@@ -495,6 +552,13 @@ const currentUser = storedUser ? JSON.parse(storedUser) : null;
                   <div>
                     <p className="text-muted-foreground">Citizen</p>
                     <p className="font-medium text-foreground">{selectedCase.citizen}</p>
+                      {/* Display phone and email under name */}
+  {/* {selectedCase.citizenPhone && (
+    <p className="text-sm text-muted-foreground"> {selectedCase.citizenPhone}</p>
+  )}
+  {selectedCase.citizenEmail && (
+    <p className="text-sm text-muted-foreground"> {selectedCase.citizenEmail}</p>
+  )} */}
                   </div>
                   <div>
                     <p className="text-muted-foreground">Location</p>
@@ -511,17 +575,17 @@ const currentUser = storedUser ? JSON.parse(storedUser) : null;
                 </div>
 
                 {/* Contact Info */}
-                {(selectedCase.citizenPhone || selectedCase.citizenEmail) && (
-                  <div className="p-3 bg-muted/50 rounded-lg space-y-2">
-                    <p className="text-sm font-medium text-foreground">Contact Information</p>
-                    {selectedCase.citizenPhone && (
-                      <p className="text-sm text-muted-foreground">{selectedCase.citizenPhone}</p>
-                    )}
-                    {selectedCase.citizenEmail && (
-                      <p className="text-sm text-muted-foreground">{selectedCase.citizenEmail}</p>
-                    )}
-                  </div>
-                )}
+            {(selectedCase.citizenPhone || selectedCase.citizenEmail) && (
+  <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+    <p className="text-sm font-medium text-muted-foreground">Contact Information</p>
+    {selectedCase.citizenPhone && (
+      <p className="text-sm font-medium text-foreground">{selectedCase.citizenPhone}</p>
+    )}
+    {selectedCase.citizenEmail && (
+      <p className="text-sm font-medium text-foreground">{selectedCase.citizenEmail}</p>
+    )}
+  </div>
+)}
 
                 {/* Status Update */}
                 <div>
@@ -531,7 +595,7 @@ const currentUser = storedUser ? JSON.parse(storedUser) : null;
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="review">Under Review</SelectItem>
+                      <SelectItem value="under_review">Under Review</SelectItem>
                       <SelectItem value="progress">In Progress</SelectItem>
                       <SelectItem value="resolved">Resolved</SelectItem>
                     </SelectContent>

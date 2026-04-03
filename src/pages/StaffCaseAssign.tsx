@@ -1,3 +1,4 @@
+//StaffCaseAssign.tsx
 import { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -25,14 +26,14 @@ interface Case {
   type: 'service' | 'complaint';
   category: string;
   description: string;
-  status: 'submitted' | 'review' | 'progress' | 'resolved';
+  status: 'submitted' | 'under_review' | 'progress' | 'resolved';
   priority: 'high' | 'medium' | 'low';
   submittedDate: string;
   citizen: string;
   citizenPhone?: string;
   citizenEmail?: string;
   location: string;
-  assignedTo: string | null;
+  assignedTo: string | { name: string } | null;
   notes: { author: string; text: string; date: string }[];
 }
 
@@ -66,7 +67,7 @@ const mockCases: Case[] = [
     type: 'complaint',
     category: 'Staff Misconduct',
     description: 'Complaint about unprofessional behavior at the sector office.',
-    status: 'review',
+    status: 'under_review',
     priority: 'high',
     submittedDate: 'Jan 4, 2025',
     citizen: 'Anonymous',
@@ -306,11 +307,16 @@ const currentUser = storedUser ? JSON.parse(storedUser) : null;
                   )}
                 </div>
                 <p className="text-sm text-muted-foreground line-clamp-2">{caseData.description}</p>
-                {caseData.assignedTo && (
-                  <p className="text-sm mt-3">
-                    Currently assigned to: <span className="font-medium">{caseData.assignedTo}</span>
-                  </p>
-                )}
+              {caseData.assignedTo && (
+  <p className="text-sm mt-3">
+    Currently assigned to:{" "}
+    <span className="font-medium">
+      {typeof caseData.assignedTo === 'object' 
+        ? caseData.assignedTo.name 
+        : caseData.assignedTo}
+    </span>
+  </p>
+)}
               </CardContent>
             </Card>
 

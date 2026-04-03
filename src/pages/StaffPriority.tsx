@@ -28,7 +28,7 @@ interface Case {
   type: 'service' | 'complaint';
   category: string;
   description: string;
-  status: 'submitted' | 'review' | 'progress' | 'resolved' | 'draft';
+  status: 'submitted' | 'review' | 'progress' | 'resolved' | 'draft' | 'closed';
   priority: 'high' | 'medium' | 'low';
   submittedDate: string;
   citizen: string;
@@ -72,7 +72,7 @@ useEffect(() => {
           description: s.description,
           status: s.status,
           priority: s.priority || "medium",
-          submittedDate: s.createdAt,
+        submittedDate: new Date(s.created_at).toLocaleString(), 
           citizen: s.user ? s.user.name : "Anonymous",
           location: s.location || "Unknown",
           assignedTo: s.assignedTo || null,
@@ -84,7 +84,7 @@ useEffect(() => {
           description: c.description,
           status: c.status,
           priority: c.priority || "medium",
-          submittedDate: c.createdAt,
+        submittedDate: new Date(c.created_at).toLocaleString(), 
           citizen: c.user ? c.user.name : "Anonymous",
           location: c.location || "Unknown",
           assignedTo: c.assignedTo || null,
@@ -103,7 +103,11 @@ useEffect(() => {
 }, []);
 
 const highPriorityCases = cases.filter(
-  c => c.priority === "high" && c.status !== "draft"
+  c =>
+    c.priority === "high" &&
+    c.status !== "draft" &&
+    c.status !== "resolved" &&
+    c.status !== "closed"
 );
 
   return (

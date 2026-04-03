@@ -1,3 +1,4 @@
+//StaffCaseAssign.tsx
 import { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -38,20 +39,26 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import StatusBadge from '@/components/StatusBadge';
 import { useEffect } from 'react';
 
+interface AssignedStaff {
+  id: string;
+  name: string;
+  department: string;
+}
+
 interface Case {
   id: string;
   referenceNumber?: string;
   type: 'service' | 'complaint';
   category: string;
   description: string;
-  status: 'submitted' | 'review' | 'progress' | 'resolved' | 'closed';
+  status: 'submitted' | 'under_review' | 'progress' | 'resolved' | 'closed';
   priority: 'high' | 'medium' | 'low';
   submittedDate: string;
   citizen: string;
   citizenPhone?: string;
   citizenEmail?: string;
   location: string;
-  assignedTo: string | null;
+  assignedTo: AssignedStaff | null;
   notes: { author: string; text: string; date: string }[];
 }
 
@@ -102,28 +109,66 @@ const [teamMembers, setTeamMembers] = useState<StaffMember[]>([]);
     }
   };
 
-  const handleStatusChange = (newStatus: 'submitted' | 'review' | 'progress' | 'resolved' | 'closed') => {
-    if (caseData) {
-      setCaseData({ ...caseData, status: newStatus });
-    }
-  };
+const handleStatusChange = async (
+  newStatus: 'submitted' | 'under_review' | 'progress' | 'resolved' | 'closed'
+) => {
+  if (!caseData) return;
 
-  const handleAssign = (staffId: string) => {
+  try {
+    const token = localStorage.getItem("token");
+
+    await fetch(
+      `http://localhost:5000/api/cases/${caseData.id}/status`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          status: newStatus,
+          type: caseData.type,
+        }),
+      }
+    );
+
+    // ✅ update UI after DB success
+    setCaseData({ ...caseData, status: newStatus });
+
+  } catch (err) {
+    console.error("Failed to update status:", err);
+  }
+};
+
+const handleAssign = (staffId: string) => {
   const staff = teamMembers.find(m => m.id === staffId);
+
   if (caseData && staff) {
-    setCaseData({ ...caseData, assignedTo: staff.name, status: 'review' });
+    // UI update immediately
+    setCaseData({
+      ...caseData,
+      assignedTo: { id: staff.id, name: staff.name, department: staff.department },
+      status: 'under_review'
+    });
+
     setAssignDialogOpen(false);
 
-    // Optionally, send update to backend
     const token = localStorage.getItem("token");
-    fetch(`http://localhost:5000/api/cases/${caseData.id}/assign`, {
+
+    fetch(`http://localhost:5000/api/dashboard/cases/${caseData.id}/assign`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ assignedTo: staff.id })
-    }).catch(console.error);
+      body: JSON.stringify({
+        staffId: staff.id,      //  correct key
+        type: caseData.type     //  VERY IMPORTANT (service or complaint)
+      })
+    })
+      .then(res => res.json())
+      .then(data => console.log("Assigned:", data))
+      .catch(console.error);
   }
 };
 
@@ -404,7 +449,10 @@ if (loading) {
       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
         <UserCircle className="h-5 w-5 text-primary" />
       </div>
-      <span className="font-medium">{caseData.assignedTo || 'Not Assigned'}</span>
+    <span className="font-medium">
+  {caseData.assignedTo?.name ? `${caseData.assignedTo.name} — ${caseData.assignedTo.department}` : 'Not Assigned'}
+</span>
+
     </div>
     <Button variant="outline" size="sm" onClick={() => setAssignDialogOpen(true)}>
       Assign
@@ -419,13 +467,13 @@ if (loading) {
   <SelectTrigger className="w-full">
     <SelectValue placeholder="Select staff..." />
   </SelectTrigger>
-  <SelectContent>
-    {teamMembers.map((staff) => (
-      <SelectItem key={staff.id} value={staff.id}>
-        {staff.name} — {staff.department}
-      </SelectItem>
-    ))}
-  </SelectContent>
+<SelectContent>
+  {teamMembers.map((staff) => (
+    <SelectItem key={staff.id} value={staff.id}>
+      {`${staff.name ?? ''} — ${String(staff.department ?? '')}`}
+    </SelectItem>
+  ))}
+</SelectContent>
 </Select>
         <Button className="mt-4" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
       </div>
@@ -440,7 +488,7 @@ if (loading) {
     value={caseData.status}
     onValueChange={(val: string) =>
       handleStatusChange(
-        val as 'submitted' | 'review' | 'progress' | 'resolved' | 'closed'
+        val as 'submitted' | 'under_review' | 'progress' | 'resolved' | 'closed'
       )
     }
   >
@@ -449,7 +497,7 @@ if (loading) {
     </SelectTrigger>
     <SelectContent>
       <SelectItem value="submitted">Submitted</SelectItem>
-      <SelectItem value="review">In Review</SelectItem>
+      <SelectItem value="under_review">Under Review</SelectItem>
       <SelectItem value="progress">In Progress</SelectItem>
       <SelectItem value="resolved">Resolved</SelectItem>
       <SelectItem value="closed">Closed</SelectItem>

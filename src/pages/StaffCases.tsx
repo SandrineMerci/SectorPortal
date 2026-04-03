@@ -1,3 +1,4 @@
+//StaffCases.tsx
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
@@ -314,7 +315,7 @@ useEffect(() => {
             >
               <AlertTriangle className="h-5 w-5" />
               <span>High Priority</span>
-              <Badge className="ml-auto bg-destructive text-destructive-foreground">{stats.highPriority}</Badge>
+              {/* <Badge className="ml-auto bg-destructive text-destructive-foreground">{stats.highPriority}</Badge> */}
             </Link>
             <Link
               to="/staff/team"
@@ -409,7 +410,7 @@ useEffect(() => {
                 <p className="text-sm text-muted-foreground hidden sm:block">Manage all citizen requests and complaints</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            {/* <div className="flex items-center gap-3">
               <Button variant="outline" size="icon" className="relative" asChild>
                 <Link to="/notifications">
                   <Bell className="h-5 w-5" />
@@ -418,7 +419,7 @@ useEffect(() => {
                   </span>
                 </Link>
               </Button>
-            </div>
+            </div> */}
           </div>
         </header>
 

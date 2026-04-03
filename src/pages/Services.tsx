@@ -36,6 +36,8 @@ const Services = () => {
     { value: 'electricity', label: t('service.electricity') },
     { value: 'health', label: t('service.health') },
     { value: 'education', label: t('service.education') },
+     {value: 'Documents', label: t('Documents') },
+    {value: 'other', label: t('Other') }
   ];
 
   const priorities = [

@@ -47,7 +47,7 @@ const CitizenLayout = ({ children, title, subtitle, showFooter = true, user }: C
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            {/* <div className="flex items-center gap-3">
               <Button variant="outline" size="icon" className="relative" asChild>
                 <Link to="/notifications">
                   <Bell className="h-5 w-5" />
@@ -56,7 +56,7 @@ const CitizenLayout = ({ children, title, subtitle, showFooter = true, user }: C
                   </span>
                 </Link>
               </Button>
-            </div>
+            </div> */}
           </div>
         </header>
 

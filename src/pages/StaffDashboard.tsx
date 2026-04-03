@@ -1,3 +1,4 @@
+//StaffDashboard.tsx
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
@@ -68,7 +69,7 @@ interface Case {
   type: 'service' | 'complaint';
   category: string;
   description: string;
-  status: 'submitted' | 'review' | 'progress' | 'resolved' | 'draft';
+  status: 'submitted' | 'under_review' | 'progress' | 'resolved' | 'draft' | 'closed';
   priority: 'high' | 'medium' | 'low';
   submittedDate: string;
   citizen: string;
@@ -115,25 +116,25 @@ const [loading, setLoading] = useState(true);
 
 useEffect(() => {
   const fetchTeam = async () => {
-    try {
-      const token = localStorage.getItem("token"); // your JWT
-      const res = await axios.get("http://localhost:5000/api/staff/team", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+  try {
+    const token = localStorage.getItem("token");
+    const res = await axios.get("http://localhost:5000/api/staff/team", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-      // calculate workloadPercent based on activeCases
-      const dataWithPercent = res.data.map((member: any) => ({
-        ...member,
-        workloadPercent: Math.min((member.activeCases / 10) * 100, 100),
-      }));
+    // Calculate workloadPercent dynamically: 10 cases = 100%
+    const dataWithPercent = res.data.map((member: any) => ({
+      ...member,
+      activeCases: member.activeCases || 0,
+      resolvedThisMonth: member.resolvedThisMonth || 0,
+      workloadPercent: Math.min(((member.activeCases || 0) / 10) * 100, 100),
+    }));
 
-      setWorkloadData(dataWithPercent);
-    } catch (err) {
-      console.error("Failed to fetch team", err);
-    }
-  };
+    setWorkloadData(dataWithPercent);
+  } catch (err) {
+    console.error("Failed to fetch team", err);
+  }
+};
 
   fetchTeam();
 }, []);
@@ -152,19 +153,18 @@ useEffect(() => {
       const data = await res.json();
 
       console.log("API DATA:", data);
-
-//       const formatStatus = (status: string): Case['status'] => {
-//   switch (status) {
-//     case 'submitted':
-//     case 'review':
-//     case 'progress':
-//     case 'resolved':
-//     case 'draft':
-//       return status;
-//     default:
-//       return 'draft'; // fallback
-//   }
-// };
+const formatStatus = (status: string): Case['status'] => {
+  switch (status) {
+    case 'submitted':
+    case 'under_review':
+    case 'progress':
+    case 'resolved':
+    case 'draft':
+      return status;
+    default:
+      return 'draft'; // fallback for unexpected status
+  }
+};
 
       // 🔥 merge services + complaints into one list
       const formattedCases: Case[] = [
@@ -215,21 +215,21 @@ if (loading) {
   return <div>Loading dashboard...</div>;
 }
 const validCases = cases.filter(c => c.status !== "draft");
-
- const stats = {
-  total: validCases.length,
-  new: validCases.filter(c => c.status === 'submitted').length,
-  inProgress: validCases.filter(c => c.status === 'progress' || c.status === 'review').length,
-  resolved: validCases.filter(c => c.status === 'resolved').length,
-  highPriority: validCases.filter(c => c.priority === 'high').length,
+const openCases = validCases.filter(c => c.status !== 'resolved' && c.status !== 'closed');
+const stats = {
+  total: openCases.length, // Remaining / Open Cases
+  new: openCases.filter(c => c.status === 'submitted').length,
+  inProgress: openCases.filter(c => c.status === 'progress' || c.status === 'under_review').length,
+  resolved: validCases.filter(c => c.status === 'resolved').length, // total resolved
+  highPriority: openCases.filter(c => c.priority === 'high').length,
 };
 
   const storedUser = localStorage.getItem("user");
 const currentUser = storedUser ? JSON.parse(storedUser) : null;
 
-  const filteredCases = cases.filter(c => {
-      if (c.status === "draft") return false;
-
+ const filteredCases = cases
+  .filter(c => !c.assignedTo && c.status !== "draft")
+  .filter(c => {
     const matchesSearch = 
       (c.id || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -277,33 +277,92 @@ notes: [...selectedCase.notes, { author: currentUser.name, text: newNote, date: 
     }
   };
 
-const handleAssign = (staffId: string) => {
+const handleAssign = async (staffId: string) => {
   const staff = workloadData.find(m => m.id === staffId);
-  if (selectedCase && staff) {
-    const updatedCases = cases.map(c => {
-      if (c.id === selectedCase.id) {
-        return { ...c, assignedTo: staff.name, status: 'review' as const };
+  if (!selectedCase || !staff) return;
+
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("Token missing");
+
+    const res = await fetch(
+      `http://localhost:5000/api/cases/${selectedCase.id}/assign`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          staffId: staff.id,
+          type: selectedCase.type,
+        }),
       }
-      return c;
-    });
+    );
+
+    if (!res.ok) {
+      const errData = await res.json();
+      console.error("Error assigning case:", errData.message);
+      return;
+    }
+
+    const updatedCase = await res.json();
+
+    // Update local state
+    const updatedCases = cases.map(c =>
+      c.id === updatedCase.reference_number
+        ? { ...c, assignedTo: staff.name, status: "under_review" as const }
+        : c
+    );
     setCases(updatedCases);
-    setSelectedCase({ ...selectedCase, assignedTo: staff.name, status: 'review' });
+    setSelectedCase({
+      ...selectedCase,
+      assignedTo: staff.name,
+      status: "under_review",
+    });
     setAssignDialogOpen(false);
+  } catch (err) {
+    console.error("Assign failed:", err);
   }
 };
 
-  const handleStatusChange = (newStatus: 'submitted' | 'review' | 'progress' | 'resolved') => {
-    if (selectedCase) {
-      const updatedCases = cases.map(c => {
-        if (c.id === selectedCase.id) {
-          return { ...c, status: newStatus };
-        }
-        return c;
-      });
-      setCases(updatedCases);
-      setSelectedCase({ ...selectedCase, status: newStatus });
+ const handleStatusChange = async (newStatus: 'submitted' | 'under_review' | 'progress' | 'resolved') => {
+  if (!selectedCase) return;
+
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("Token missing");
+
+    const res = await fetch(`http://localhost:5000/api/dashboard/cases/${selectedCase.id}/status`, {
+      method: 'PATCH',
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        status: newStatus,
+        type: selectedCase.type,
+      }),
+    });
+
+    if (!res.ok) {
+      const errData = await res.json();
+      console.error("Failed to update status:", errData.message);
+      return;
     }
-  };
+
+    const updatedCase = await res.json();
+
+    // Update local state
+    setCases(prev =>
+      prev.map(c => c.id === updatedCase.reference_number ? { ...c, status: updatedCase.status } : c)
+    );
+    setSelectedCase(prev => prev ? { ...prev, status: updatedCase.status } : null);
+
+  } catch (err) {
+    console.error("Error updating status:", err);
+  }
+};
 
  // Dragging a case
 const handleDragStart = (caseId: string) => {
@@ -322,7 +381,7 @@ const handleDrop = (staffId: string) => {
   const staff = workloadData.find((m) => m.id === staffId);
   if (staff) {
     const updatedCases = cases.map((c) =>
-      c.id === draggedCase ? { ...c, assignedTo: staff.name, status: 'review' as const } : c
+      c.id === draggedCase ? { ...c, assignedTo: staff.name, status: 'under_review' as const } : c
     );
     setCases(updatedCases);
 
@@ -369,7 +428,7 @@ const handleDrop = (staffId: string) => {
             >
               <FileText className="h-5 w-5" />
               <span>All Cases</span>
-              <Badge className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground">{stats.total}</Badge>
+              {/* <Badge className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground">{stats.total}</Badge> */}
             </Link>
             <Link
               to="/staff/priority"
@@ -377,7 +436,7 @@ const handleDrop = (staffId: string) => {
             >
               <AlertTriangle className="h-5 w-5" />
               <span>High Priority</span>
-              <Badge className="ml-auto bg-destructive text-destructive-foreground">{stats.highPriority}</Badge>
+              {/* <Badge className="ml-auto bg-destructive text-destructive-foreground">{stats.highPriority}</Badge> */}
             </Link>
             <Link
               to="/staff/team"
@@ -474,7 +533,7 @@ const handleDrop = (staffId: string) => {
                 <p className="text-sm text-muted-foreground hidden sm:block">Manage and assign citizen requests and complaints</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            {/* <div className="flex items-center gap-3">
               <Button variant="outline" size="icon" className="relative" asChild>
                 <Link to="/notifications">
                   <Bell className="h-5 w-5" />
@@ -483,7 +542,7 @@ const handleDrop = (staffId: string) => {
                   </span>
                 </Link>
               </Button>
-            </div>
+            </div> */}
           </div>
         </header>
 
@@ -495,7 +554,7 @@ const handleDrop = (staffId: string) => {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">All Cases</p>
+                    <p className="text-sm text-muted-foreground">Cases</p>
                     <p className="text-2xl font-bold text-foreground">{stats.new}</p>
                   </div>
                   <div className="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center">
@@ -622,11 +681,11 @@ const handleDrop = (staffId: string) => {
               <p className="text-sm text-muted-foreground truncate">{caseItem.description}</p>
               <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
-                  <UserCircle className="h-3 w-3" />
+                  <MapPin className="h-3 w-3" />
                   {caseItem.location}
                 </span>
                 <span className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
+                  <Calendar className="h-3 w-3" />
                   {caseItem.submittedDate}
                 </span>
               </div>
@@ -654,35 +713,35 @@ const handleDrop = (staffId: string) => {
       Workload Distribution
     </CardTitle>
   </CardHeader>
-  <CardContent className="space-y-4 max-h-[520px] overflow-y-auto">
-    {workloadData.map((member) => (
-      <div
-        key={member.id}
-        onDragOver={handleDragOver}
-        onDrop={() => handleDrop(member.id)}
-        className={`p-3 rounded-lg border border-border hover:border-primary/50 transition-colors ${
-          member.workloadPercent >= 100 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-        }`}
-      >
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <UserCircle className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm font-medium">{member.name}</p>
-              <p className="text-xs text-muted-foreground">{member.role}</p>
-            </div>
+ <CardContent className="space-y-4 max-h-[520px] overflow-y-auto">
+  {workloadData.map((member) => (
+    <div
+      key={member.id}
+      onDragOver={handleDragOver}
+      onDrop={() => handleDrop(member.id)}
+      className={`p-3 rounded-lg border border-border hover:border-primary/50 transition-colors ${
+        member.workloadPercent >= 100 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+      }`}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+            <UserCircle className="h-4 w-4 text-primary" />
           </div>
-          <Badge variant="outline">{member.activeCases} active</Badge>
+          <div>
+            <p className="text-sm font-medium">{member.name}</p>
+            <p className="text-xs text-muted-foreground">{member.role}</p>
+          </div>
         </div>
-        <Progress value={member.workloadPercent} className="h-2" />
-        <p className="text-xs text-muted-foreground mt-1">
-          {member.resolvedThisMonth} resolved this month
-        </p>
+        <Badge variant="outline">{member.activeCases} active</Badge>
       </div>
-    ))}
-  </CardContent>
+      <Progress value={member.workloadPercent} className="h-2" />
+      <p className="text-xs text-muted-foreground mt-1">
+        {member.resolvedThisMonth} resolved this month
+      </p>
+    </div>
+  ))}
+</CardContent>
 </Card>
 
               {/* Quick Stats */}
